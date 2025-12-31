@@ -322,16 +322,19 @@ function storage.checkAlerts()
     local alerts = {}
     
     for itemName, minQty in pairs(config.stock_alerts) do
-        local item = storage.inventory[itemName]
-        local currentQty = item and item.count or 0
-        
-        if currentQty < minQty then
-            table.insert(alerts, {
-                name = itemName,
-                displayName = storage.getDisplayName(itemName),
-                current = currentQty,
-                minimum = minQty
-            })
+        -- Seulement si le seuil est > 0
+        if minQty and minQty > 0 then
+            local item = storage.inventory[itemName]
+            local currentQty = item and item.count or 0
+            
+            if currentQty < minQty then
+                table.insert(alerts, {
+                    name = itemName,
+                    displayName = storage.getDisplayName(itemName),
+                    current = currentQty,
+                    minimum = minQty
+                })
+            end
         end
     end
     

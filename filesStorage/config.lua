@@ -130,9 +130,10 @@ config.display = {
 
 -- === ALERTES DE STOCK ===
 -- Items à surveiller avec quantité minimum
+-- Seuil 0 = pas d'alerte (desactive)
+-- Gerez via l'interface moniteur
 config.stock_alerts = {
-    ["minecraft:torch"] = 64,
-    ["minecraft:coal"] = 32,
+    -- Exemple: ["minecraft:torch"] = 64,
 }
 
 -- === FONCTIONS UTILITAIRES ===
