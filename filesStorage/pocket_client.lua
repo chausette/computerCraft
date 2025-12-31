@@ -1,7 +1,6 @@
 -- ============================================
 -- CLIENT POCKET ADVANCED - STOCKAGE
--- Recherche temps reel + navigation fleches
--- Retour = Backspace (quand vide)
+-- Avec systeme de panier multi-items
 -- ============================================
 
 local PROTOCOL = "storage_system"
@@ -10,6 +9,7 @@ local SERVER_ID = "storage_server"
 local serverId = nil
 local running = true
 local allItems = {}
+local cart = {}  -- Panier: {name, displayName, count, maxCount}
 
 -- === COULEURS ===
 local colors_bg = colors.black
@@ -21,6 +21,7 @@ local colors_success = colors.lime
 local colors_warning = colors.yellow
 local colors_error = colors.red
 local colors_selected = colors.blue
+local colors_cart = colors.orange
 
 -- === FONCTIONS RESEAU ===
 
@@ -52,7 +53,7 @@ local function sendRequest(request, timeout)
         return nil, "Non connecte"
     end
     
-    timeout = timeout or 10  -- Timeout par defaut 10 secondes
+    timeout = timeout or 10
     
     rednet.send(serverId, request, PROTOCOL)
     local sender, response = rednet.receive(PROTOCOL, timeout)
@@ -79,10 +80,26 @@ local function drawHeader(title)
     term.setTextColor(colors_text)
     term.setCursorPos(1, 1)
     term.write(string.rep(" ", w))
-    local padding = math.floor((w - #title) / 2)
+    
+    -- Afficher titre
+    local displayTitle = title
+    local cartCount = #cart
+    if cartCount > 0 then
+        displayTitle = title:sub(1, w - 5)
+    end
+    local padding = math.floor((w - #displayTitle) / 2)
     term.setCursorPos(padding + 1, 1)
-    term.write(title)
+    term.write(displayTitle)
+    
+    -- Indicateur panier
+    if cartCount > 0 then
+        term.setCursorPos(w - 3, 1)
+        term.setTextColor(colors_cart)
+        term.write("[" .. cartCount .. "]")
+    end
+    
     term.setBackgroundColor(colors_bg)
+    term.setTextColor(colors_text)
 end
 
 local function drawFooter(text)
@@ -105,6 +122,73 @@ local function writeAt(x, y, text, fg, bg)
     term.setTextColor(colors_text)
 end
 
+-- === GESTION DU PANIER ===
+
+local function getCartTotal()
+    local total = 0
+    for _, item in ipairs(cart) do
+        total = total + item.count
+    end
+    return total
+end
+
+local function findInCart(itemName)
+    for i, item in ipairs(cart) do
+        if item.name == itemName then
+            return i, item
+        end
+    end
+    return nil, nil
+end
+
+local function addToCart(item, qty)
+    local idx, existing = findInCart(item.name)
+    
+    if existing then
+        -- Mettre a jour la quantite
+        existing.count = math.min(existing.count + qty, existing.maxCount)
+    else
+        -- Ajouter au panier
+        table.insert(cart, {
+            name = item.name,
+            displayName = item.displayName,
+            count = qty,
+            maxCount = item.count
+        })
+    end
+end
+
+local function removeFromCart(index)
+    if cart[index] then
+        table.remove(cart, index)
+    end
+end
+
+local function clearCart()
+    cart = {}
+end
+
+local function updateCartMaxCounts()
+    -- Met a jour les quantites max apres un achat
+    for i = #cart, 1, -1 do
+        local cartItem = cart[i]
+        local found = false
+        for _, item in ipairs(allItems) do
+            if item.name == cartItem.name then
+                cartItem.maxCount = item.count
+                if cartItem.count > cartItem.maxCount then
+                    cartItem.count = cartItem.maxCount
+                end
+                found = true
+                break
+            end
+        end
+        if not found or cartItem.maxCount <= 0 then
+            table.remove(cart, i)
+        end
+    end
+end
+
 -- === CHARGEMENT INVENTAIRE ===
 
 local function loadAllItems()
@@ -122,6 +206,7 @@ local function loadAllItems()
         table.sort(allItems, function(a, b)
             return a.displayName < b.displayName
         end)
+        updateCartMaxCounts()
         return true
     end
     return false
@@ -147,219 +232,54 @@ local function filterItems(query)
     return results
 end
 
--- === INTERFACE RECHERCHE TEMPS REEL ===
+-- === INTERFACE MESSAGE ===
 
-local function searchInterface()
-    loadAllItems()
+local function showMessage(title, message, isError)
+    clearScreen()
+    drawHeader(title)
     
-    local query = ""
-    local selectedIdx = 1
-    local scrollOffset = 0
-    local filteredItems = allItems
-    local maxVisible = h - 5
+    local color = isError and colors_error or colors_success
     
-    local function redraw()
-        clearScreen()
-        drawHeader("RECHERCHE")
-        
-        -- Barre de recherche
-        writeAt(1, 2, ">", colors_accent)
-        writeAt(3, 2, query, colors_text)
-        writeAt(3 + #query, 2, "_", colors_dim)
-        
-        -- Ligne de separation
-        writeAt(1, 3, string.rep("-", w), colors_dim)
-        
-        -- Liste des resultats
-        local startY = 4
-        
-        if #filteredItems == 0 then
-            writeAt(2, startY, "Aucun resultat", colors_dim)
-        else
-            for i = 1, maxVisible do
-                local idx = scrollOffset + i
-                local item = filteredItems[idx]
-                
-                if item then
-                    local y = startY + i - 1
-                    local isSelected = (idx == selectedIdx)
-                    
-                    if isSelected then
-                        term.setCursorPos(1, y)
-                        term.setBackgroundColor(colors_selected)
-                        term.write(string.rep(" ", w))
-                    end
-                    
-                    local name = item.displayName
-                    local maxLen = w - 8
-                    if #name > maxLen then
-                        name = name:sub(1, maxLen - 2) .. ".."
-                    end
-                    
-                    local nameColor = colors_text
-                    if item.count == 0 then
-                        nameColor = colors_error
-                    elseif item.count < 10 then
-                        nameColor = colors_warning
-                    end
-                    
-                    writeAt(2, y, name, nameColor, isSelected and colors_selected or colors_bg)
-                    
-                    local countStr = tostring(item.count)
-                    writeAt(w - #countStr, y, countStr, colors_accent, isSelected and colors_selected or colors_bg)
-                    
-                    term.setBackgroundColor(colors_bg)
-                end
-            end
-        end
-        
-        local info = #filteredItems .. " items"
-        if #filteredItems > 0 then
-            info = selectedIdx .. "/" .. #filteredItems
-        end
-        drawFooter("^v:Nav Enter:Ok Bksp:Ret " .. info)
-        
-        term.setCursorPos(3 + #query, 2)
+    local lines = {}
+    local maxLen = w - 4
+    while #message > 0 do
+        table.insert(lines, message:sub(1, maxLen))
+        message = message:sub(maxLen + 1)
     end
     
-    redraw()
-    
-    while true do
-        local event, p1, p2, p3 = os.pullEvent()
-        
-        if event == "char" then
-            query = query .. p1
-            filteredItems = filterItems(query)
-            selectedIdx = 1
-            scrollOffset = 0
-            redraw()
-            
-        elseif event == "key" then
-            local key = p1
-            
-            if key == keys.backspace then
-                if #query > 0 then
-                    -- Effacer caractere
-                    query = query:sub(1, -2)
-                    filteredItems = filterItems(query)
-                    selectedIdx = 1
-                    scrollOffset = 0
-                    redraw()
-                else
-                    -- Retour si recherche vide
-                    return nil
-                end
-                
-            elseif key == keys.up then
-                if selectedIdx > 1 then
-                    selectedIdx = selectedIdx - 1
-                    if selectedIdx <= scrollOffset then
-                        scrollOffset = scrollOffset - 1
-                    end
-                end
-                redraw()
-                
-            elseif key == keys.down then
-                if selectedIdx < #filteredItems then
-                    selectedIdx = selectedIdx + 1
-                    if selectedIdx > scrollOffset + maxVisible then
-                        scrollOffset = scrollOffset + 1
-                    end
-                end
-                redraw()
-                
-            elseif key == keys.enter then
-                if #filteredItems > 0 and filteredItems[selectedIdx] then
-                    return filteredItems[selectedIdx]
-                end
-                
-            elseif key == keys.pageUp then
-                selectedIdx = math.max(1, selectedIdx - maxVisible)
-                scrollOffset = math.max(0, selectedIdx - 1)
-                redraw()
-                
-            elseif key == keys.pageDown then
-                selectedIdx = math.min(#filteredItems, selectedIdx + maxVisible)
-                scrollOffset = math.max(0, selectedIdx - maxVisible)
-                redraw()
-            end
-        end
-    end
-end
-
--- === INTERFACE ACTION ITEM ===
-
-local function itemActionInterface(item)
-    local selectedOption = 1
-    local options = {
-        {text = "Commander", action = "retrieve"},
-        {text = "Ajouter aux favoris", action = "add_fav"},
-        {text = "Retirer des favoris", action = "rem_fav"},
-        {text = "Retour", action = "back"}
-    }
-    
-    local function redraw()
-        clearScreen()
-        drawHeader(item.displayName:sub(1, w))
-        
-        writeAt(2, 3, "Stock: " .. item.count, item.count > 0 and colors_success or colors_error)
-        writeAt(2, 4, "Cat: " .. (item.category or "?"), colors_dim)
-        
-        writeAt(1, 6, string.rep("-", w), colors_dim)
-        
-        for i, opt in ipairs(options) do
-            local y = 7 + i
-            local isSelected = (i == selectedOption)
-            
-            if isSelected then
-                term.setCursorPos(1, y)
-                term.setBackgroundColor(colors_selected)
-                term.write(string.rep(" ", w))
-                writeAt(2, y, "> " .. opt.text, colors_text, colors_selected)
-            else
-                writeAt(2, y, "  " .. opt.text, colors_dim)
-            end
-        end
-        
-        term.setBackgroundColor(colors_bg)
-        drawFooter("^v:Nav Enter:Ok Bksp:Retour")
+    local startY = math.floor(h/2) - math.floor(#lines/2)
+    for i, line in ipairs(lines) do
+        writeAt(2, startY + i - 1, line, color)
     end
     
-    redraw()
-    
-    while true do
-        local event, key = os.pullEvent("key")
-        
-        if key == keys.up then
-            selectedOption = selectedOption > 1 and selectedOption - 1 or #options
-            redraw()
-        elseif key == keys.down then
-            selectedOption = selectedOption < #options and selectedOption + 1 or 1
-            redraw()
-        elseif key == keys.enter then
-            return options[selectedOption].action
-        elseif key == keys.backspace then
-            return "back"
-        end
-    end
+    drawFooter("Appuyez sur une touche...")
+    os.pullEvent("key")
 end
 
 -- === INTERFACE QUANTITE ===
 
-local function quantityInterface(item, maxQty)
+local function quantityInterface(item, maxQty, forCart)
     local qty = 1
-    maxQty = math.min(maxQty, item.count, 64)
+    maxQty = math.min(maxQty, item.count or item.maxCount, 64)
     
     if maxQty <= 0 then
         return 0
     end
     
+    -- Si c'est pour le panier et l'item y est deja, proposer sa quantite actuelle
+    local _, existing = findInCart(item.name)
+    if forCart and existing then
+        qty = existing.count
+    end
+    
     local function redraw()
         clearScreen()
-        drawHeader("COMMANDER")
+        drawHeader(forCart and "AJOUTER AU PANIER" or "COMMANDER")
         
-        writeAt(2, 3, item.displayName, colors_text)
-        writeAt(2, 4, "Stock: " .. item.count, colors_dim)
+        local name = item.displayName
+        if #name > w - 4 then name = name:sub(1, w - 7) .. ".." end
+        writeAt(2, 3, name, colors_text)
+        writeAt(2, 4, "Stock: " .. (item.count or item.maxCount), colors_dim)
         
         writeAt(2, 6, "Quantite:", colors_text)
         
@@ -408,52 +328,421 @@ local function quantityInterface(item, maxQty)
     end
 end
 
--- === INTERFACE MESSAGE ===
+-- === INTERFACE RECHERCHE ===
 
-local function showMessage(title, message, isError)
-    clearScreen()
-    drawHeader(title)
+local function searchInterface()
+    loadAllItems()
     
-    local color = isError and colors_error or colors_success
+    local query = ""
+    local selectedIdx = 1
+    local scrollOffset = 0
+    local filteredItems = allItems
+    local maxVisible = h - 5
     
-    -- Gerer les messages longs
-    local lines = {}
-    local maxLen = w - 4
-    while #message > 0 do
-        table.insert(lines, message:sub(1, maxLen))
-        message = message:sub(maxLen + 1)
+    local function redraw()
+        clearScreen()
+        drawHeader("RECHERCHE")
+        
+        writeAt(1, 2, ">", colors_accent)
+        writeAt(3, 2, query, colors_text)
+        writeAt(3 + #query, 2, "_", colors_dim)
+        
+        writeAt(1, 3, string.rep("-", w), colors_dim)
+        
+        local startY = 4
+        
+        if #filteredItems == 0 then
+            writeAt(2, startY, "Aucun resultat", colors_dim)
+        else
+            for i = 1, maxVisible do
+                local idx = scrollOffset + i
+                local item = filteredItems[idx]
+                
+                if item then
+                    local y = startY + i - 1
+                    local isSelected = (idx == selectedIdx)
+                    
+                    if isSelected then
+                        term.setCursorPos(1, y)
+                        term.setBackgroundColor(colors_selected)
+                        term.write(string.rep(" ", w))
+                    end
+                    
+                    -- Verifier si dans le panier
+                    local _, inCart = findInCart(item.name)
+                    local prefix = inCart and "*" or " "
+                    
+                    local name = item.displayName
+                    local maxLen = w - 9
+                    if #name > maxLen then
+                        name = name:sub(1, maxLen - 2) .. ".."
+                    end
+                    
+                    local nameColor = colors_text
+                    if item.count == 0 then
+                        nameColor = colors_error
+                    elseif item.count < 10 then
+                        nameColor = colors_warning
+                    end
+                    
+                    writeAt(1, y, prefix, colors_cart, isSelected and colors_selected or colors_bg)
+                    writeAt(2, y, name, nameColor, isSelected and colors_selected or colors_bg)
+                    
+                    local countStr = tostring(item.count)
+                    writeAt(w - #countStr, y, countStr, colors_accent, isSelected and colors_selected or colors_bg)
+                    
+                    term.setBackgroundColor(colors_bg)
+                end
+            end
+        end
+        
+        local info = #filteredItems .. " items"
+        if #filteredItems > 0 then
+            info = selectedIdx .. "/" .. #filteredItems
+        end
+        drawFooter("^v:Nav Enter:Ok Bksp:Ret")
+        
+        term.setCursorPos(3 + #query, 2)
     end
     
-    local startY = math.floor(h/2) - math.floor(#lines/2)
-    for i, line in ipairs(lines) do
-        writeAt(2, startY + i - 1, line, color)
+    redraw()
+    
+    while true do
+        local event, p1, p2, p3 = os.pullEvent()
+        
+        if event == "char" then
+            query = query .. p1
+            filteredItems = filterItems(query)
+            selectedIdx = 1
+            scrollOffset = 0
+            redraw()
+            
+        elseif event == "key" then
+            local key = p1
+            
+            if key == keys.backspace then
+                if #query > 0 then
+                    query = query:sub(1, -2)
+                    filteredItems = filterItems(query)
+                    selectedIdx = 1
+                    scrollOffset = 0
+                    redraw()
+                else
+                    return nil
+                end
+                
+            elseif key == keys.up then
+                if selectedIdx > 1 then
+                    selectedIdx = selectedIdx - 1
+                    if selectedIdx <= scrollOffset then
+                        scrollOffset = scrollOffset - 1
+                    end
+                end
+                redraw()
+                
+            elseif key == keys.down then
+                if selectedIdx < #filteredItems then
+                    selectedIdx = selectedIdx + 1
+                    if selectedIdx > scrollOffset + maxVisible then
+                        scrollOffset = scrollOffset + 1
+                    end
+                end
+                redraw()
+                
+            elseif key == keys.enter then
+                if #filteredItems > 0 and filteredItems[selectedIdx] then
+                    return filteredItems[selectedIdx]
+                end
+                
+            elseif key == keys.pageUp then
+                selectedIdx = math.max(1, selectedIdx - maxVisible)
+                scrollOffset = math.max(0, selectedIdx - 1)
+                redraw()
+                
+            elseif key == keys.pageDown then
+                selectedIdx = math.min(#filteredItems, selectedIdx + maxVisible)
+                scrollOffset = math.max(0, selectedIdx - maxVisible)
+                redraw()
+            end
+        end
+    end
+end
+
+-- === INTERFACE ACTION ITEM ===
+
+local function itemActionInterface(item)
+    local selectedOption = 1
+    local _, inCart = findInCart(item.name)
+    
+    local options = {
+        {text = "Ajouter au panier", action = "add_cart"},
+        {text = "Commander direct", action = "retrieve"},
+        {text = "Ajouter aux favoris", action = "add_fav"},
+        {text = "Retirer des favoris", action = "rem_fav"},
+        {text = "Retour", action = "back"}
+    }
+    
+    local function redraw()
+        clearScreen()
+        
+        local title = item.displayName
+        if #title > w then title = title:sub(1, w - 3) .. ".." end
+        drawHeader(title)
+        
+        writeAt(2, 3, "Stock: " .. item.count, item.count > 0 and colors_success or colors_error)
+        writeAt(2, 4, "Cat: " .. (item.category or "?"), colors_dim)
+        
+        if inCart then
+            writeAt(2, 5, "Dans panier: " .. inCart.count, colors_cart)
+        end
+        
+        writeAt(1, 6, string.rep("-", w), colors_dim)
+        
+        for i, opt in ipairs(options) do
+            local y = 6 + i
+            local isSelected = (i == selectedOption)
+            
+            if isSelected then
+                term.setCursorPos(1, y)
+                term.setBackgroundColor(colors_selected)
+                term.write(string.rep(" ", w))
+                writeAt(2, y, "> " .. opt.text, colors_text, colors_selected)
+            else
+                writeAt(2, y, "  " .. opt.text, colors_dim)
+            end
+        end
+        
+        term.setBackgroundColor(colors_bg)
+        drawFooter("^v:Nav Enter:Ok Bksp:Retour")
     end
     
-    drawFooter("Appuyez sur une touche...")
-    os.pullEvent("key")
+    redraw()
+    
+    while true do
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            selectedOption = selectedOption > 1 and selectedOption - 1 or #options
+            redraw()
+        elseif key == keys.down then
+            selectedOption = selectedOption < #options and selectedOption + 1 or 1
+            redraw()
+        elseif key == keys.enter then
+            return options[selectedOption].action
+        elseif key == keys.backspace then
+            return "back"
+        end
+    end
+end
+
+-- === INTERFACE PANIER ===
+
+local function cartInterface()
+    if #cart == 0 then
+        showMessage("PANIER", "Le panier est vide", false)
+        return
+    end
+    
+    local selectedIdx = 1
+    local maxVisible = h - 6
+    local scrollOffset = 0
+    
+    local function redraw()
+        clearScreen()
+        drawHeader("PANIER (" .. getCartTotal() .. " items)")
+        
+        writeAt(1, 2, string.rep("-", w), colors_dim)
+        
+        local startY = 3
+        
+        for i = 1, maxVisible do
+            local idx = scrollOffset + i
+            local item = cart[idx]
+            
+            if item then
+                local y = startY + i - 1
+                local isSelected = (idx == selectedIdx)
+                
+                if isSelected then
+                    term.setCursorPos(1, y)
+                    term.setBackgroundColor(colors_selected)
+                    term.write(string.rep(" ", w))
+                end
+                
+                local name = item.displayName
+                local maxLen = w - 10
+                if #name > maxLen then
+                    name = name:sub(1, maxLen - 2) .. ".."
+                end
+                
+                writeAt(2, y, name, colors_text, isSelected and colors_selected or colors_bg)
+                
+                local qtyStr = "x" .. item.count
+                writeAt(w - #qtyStr - 1, y, qtyStr, colors_accent, isSelected and colors_selected or colors_bg)
+                
+                term.setBackgroundColor(colors_bg)
+            end
+        end
+        
+        -- Boutons en bas
+        local btnY = h - 3
+        writeAt(1, btnY, string.rep("-", w), colors_dim)
+        
+        writeAt(2, btnY + 1, "[Enter] COMMANDER TOUT", colors_success)
+        writeAt(2, btnY + 2, "[Del] Suppr  [E] Qte  [C] Vider", colors_dim)
+        
+        drawFooter("^v:Nav Bksp:Retour")
+    end
+    
+    redraw()
+    
+    while true do
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            if selectedIdx > 1 then
+                selectedIdx = selectedIdx - 1
+                if selectedIdx <= scrollOffset then
+                    scrollOffset = scrollOffset - 1
+                end
+            end
+            redraw()
+            
+        elseif key == keys.down then
+            if selectedIdx < #cart then
+                selectedIdx = selectedIdx + 1
+                if selectedIdx > scrollOffset + maxVisible then
+                    scrollOffset = scrollOffset + 1
+                end
+            end
+            redraw()
+            
+        elseif key == keys.enter then
+            -- Commander tout le panier
+            return "order_all"
+            
+        elseif key == keys.delete or key == keys.x then
+            -- Supprimer l'item selectionne
+            removeFromCart(selectedIdx)
+            if #cart == 0 then
+                return "empty"
+            end
+            selectedIdx = math.min(selectedIdx, #cart)
+            redraw()
+            
+        elseif key == keys.e then
+            -- Modifier la quantite
+            local item = cart[selectedIdx]
+            if item then
+                local newQty = quantityInterface(item, item.maxCount, false)
+                if newQty > 0 then
+                    item.count = newQty
+                end
+            end
+            redraw()
+            
+        elseif key == keys.c then
+            -- Vider le panier
+            clearCart()
+            return "empty"
+            
+        elseif key == keys.backspace then
+            return "back"
+        end
+    end
 end
 
 -- === ACTIONS ===
 
-local function doRetrieve(item)
+local function doRetrieveSingle(item, qty)
+    local response, err = sendRequest({
+        type = "retrieve_item",
+        itemName = item.name,
+        count = qty
+    }, 15)
+    
+    return response
+end
+
+local function doRetrieveCart()
+    if #cart == 0 then
+        return
+    end
+    
+    clearScreen()
+    drawHeader("COMMANDE EN COURS")
+    
+    local totalOrdered = 0
+    local errors = {}
+    
+    for i, item in ipairs(cart) do
+        local y = 3 + i
+        if y < h - 2 then
+            writeAt(2, y, item.displayName:sub(1, w - 10), colors_dim)
+            writeAt(w - 5, y, "...", colors_dim)
+        end
+        
+        local response = doRetrieveSingle(item, item.count)
+        
+        if response and response.success then
+            totalOrdered = totalOrdered + (response.data or item.count)
+            if y < h - 2 then
+                writeAt(w - 5, y, " OK ", colors_success)
+            end
+        else
+            table.insert(errors, item.displayName)
+            if y < h - 2 then
+                writeAt(w - 5, y, "FAIL", colors_error)
+            end
+        end
+        
+        sleep(0.2)  -- Petit delai entre les requetes
+    end
+    
+    -- Vider le panier
+    clearCart()
+    loadAllItems()
+    
+    -- Afficher le resultat
+    if #errors == 0 then
+        showMessage("OK", totalOrdered .. " items envoyes!", false)
+    else
+        showMessage("ATTENTION", totalOrdered .. " items OK, " .. #errors .. " erreurs", true)
+    end
+end
+
+local function doAddToCart(item)
     if item.count <= 0 then
         showMessage("ERREUR", "Stock vide!", true)
         return
     end
     
-    local qty = quantityInterface(item, item.count)
+    local qty = quantityInterface(item, item.count, true)
+    
+    if qty > 0 then
+        addToCart(item, qty)
+        -- Pas de message, retour direct pour continuer a ajouter
+    end
+end
+
+local function doRetrieveDirect(item)
+    if item.count <= 0 then
+        showMessage("ERREUR", "Stock vide!", true)
+        return
+    end
+    
+    local qty = quantityInterface(item, item.count, false)
     
     if qty > 0 then
         clearScreen()
         drawHeader("ENVOI...")
         writeAt(2, math.floor(h/2), "Transfert en cours...", colors_dim)
-        writeAt(2, math.floor(h/2) + 1, "Patientez...", colors_dim)
         
         local response, err = sendRequest({
             type = "retrieve_item",
             itemName = item.name,
             count = qty
-        }, 15)  -- Timeout 15 secondes
+        }, 15)
         
         if response then
             if response.success then
@@ -463,8 +752,7 @@ local function doRetrieve(item)
             end
             loadAllItems()
         else
-            -- Timeout mais verifier si ca a marche
-            showMessage("ATTENTION", "Timeout - verifiez le coffre de sortie", true)
+            showMessage("ATTENTION", "Timeout - verifiez le coffre", true)
             loadAllItems()
         end
     end
@@ -537,9 +825,13 @@ local function favoritesInterface()
                     term.write(string.rep(" ", w))
                 end
                 
+                -- Verifier si dans le panier
+                local _, inCart = findInCart(fav.name)
+                local prefix = inCart and "*" or " "
+                
                 local name = fav.displayName
-                if #name > w - 10 then
-                    name = name:sub(1, w - 13) .. ".."
+                if #name > w - 11 then
+                    name = name:sub(1, w - 14) .. ".."
                 end
                 
                 local nameColor = colors_text
@@ -549,13 +841,14 @@ local function favoritesInterface()
                     nameColor = colors_warning
                 end
                 
+                writeAt(1, y, prefix, colors_cart, isSelected and colors_selected or colors_bg)
                 writeAt(2, y, name, nameColor, isSelected and colors_selected or colors_bg)
                 writeAt(w - #tostring(fav.count), y, tostring(fav.count), colors_accent, isSelected and colors_selected or colors_bg)
             end
         end
         
         term.setBackgroundColor(colors_bg)
-        drawFooter("^v:Nav Enter:Cmd Bksp:Ret")
+        drawFooter("^v:Nav Enter:Panier Bksp:Ret")
     end
     
     redraw()
@@ -582,13 +875,13 @@ local function favoritesInterface()
         elseif key == keys.enter then
             local fav = favorites[selectedIdx]
             if fav and fav.inStock and fav.count > 0 then
-                doRetrieve(fav)
+                doAddToCart(fav)
+                -- Rafraichir les favoris
                 response = sendRequest({type = "get_favorites"})
                 if response and response.success then
                     favorites = response.data
                 end
                 if #favorites == 0 then return end
-                selectedIdx = math.min(selectedIdx, #favorites)
                 redraw()
             elseif fav then
                 showMessage("INFO", "Stock vide!", false)
@@ -684,8 +977,10 @@ local function categoriesInterface()
                 local item = searchInterface()
                 if item then
                     local action = itemActionInterface(item)
-                    if action == "retrieve" then
-                        doRetrieve(item)
+                    if action == "add_cart" then
+                        doAddToCart(item)
+                    elseif action == "retrieve" then
+                        doRetrieveDirect(item)
                     elseif action == "add_fav" then
                         doAddFavorite(item)
                     elseif action == "rem_fav" then
@@ -767,18 +1062,14 @@ local function emptyInputInterface()
     writeAt(2, math.floor(h/2), "Tri en cours...", colors_dim)
     writeAt(2, math.floor(h/2) + 1, "Patientez...", colors_dim)
     
-    local response, err = sendRequest({type = "empty_input"}, 20)  -- Timeout 20 secondes
+    local response, err = sendRequest({type = "empty_input"}, 20)
     
     if response then
         local count = response.data or 0
         local msg = count .. " items tries"
-        if response.error then
-            msg = msg .. " (" .. response.error .. ")"
-        end
         showMessage("OK", msg, false)
     else
-        -- Timeout mais peut-etre que ca a marche
-        showMessage("ATTENTION", "Timeout - le tri a peut-etre fonctionne", false)
+        showMessage("ATTENTION", "Timeout - verifiez le coffre", false)
     end
     
     loadAllItems()
@@ -787,18 +1078,29 @@ end
 -- === MENU PRINCIPAL ===
 
 local function mainMenu()
-    local options = {
-        {text = "Rechercher"},
-        {text = "Favoris"},
-        {text = "Categories"},
-        {text = "Statistiques"},
-        {text = "Trier entree"},
-        {text = "Quitter"}
-    }
+    local function getOptions()
+        local opts = {
+            {text = "Rechercher"},
+            {text = "Favoris"},
+            {text = "Categories"},
+            {text = "Statistiques"},
+            {text = "Trier entree"},
+            {text = "Quitter"}
+        }
+        
+        -- Ajouter option panier si non vide
+        if #cart > 0 then
+            table.insert(opts, 1, {text = "PANIER (" .. getCartTotal() .. ")", isCart = true})
+        end
+        
+        return opts
+    end
     
     local selectedIdx = 1
     
     local function redraw()
+        local options = getOptions()
+        
         clearScreen()
         drawHeader("STOCKAGE")
         
@@ -810,9 +1112,12 @@ local function mainMenu()
                 term.setCursorPos(1, y)
                 term.setBackgroundColor(colors_selected)
                 term.write(string.rep(" ", w))
-                writeAt(3, y, "> " .. opt.text, colors_text, colors_selected)
+                
+                local textColor = opt.isCart and colors_cart or colors_text
+                writeAt(3, y, "> " .. opt.text, textColor, colors_selected)
             else
-                writeAt(3, y, "  " .. opt.text, colors_dim)
+                local textColor = opt.isCart and colors_cart or colors_dim
+                writeAt(3, y, "  " .. opt.text, textColor)
             end
         end
         
@@ -824,6 +1129,7 @@ local function mainMenu()
     
     while running do
         local event, key = os.pullEvent("key")
+        local options = getOptions()
         
         if key == keys.up then
             selectedIdx = selectedIdx > 1 and selectedIdx - 1 or #options
@@ -832,13 +1138,24 @@ local function mainMenu()
             selectedIdx = selectedIdx < #options and selectedIdx + 1 or 1
             redraw()
         elseif key == keys.enter then
-            if selectedIdx == 1 then
+            local opt = options[selectedIdx]
+            
+            if opt.isCart then
+                -- Menu panier
+                local result = cartInterface()
+                if result == "order_all" then
+                    doRetrieveCart()
+                end
+                redraw()
+            elseif opt.text == "Rechercher" then
                 loadAllItems()
                 local item = searchInterface()
                 if item then
                     local action = itemActionInterface(item)
-                    if action == "retrieve" then
-                        doRetrieve(item)
+                    if action == "add_cart" then
+                        doAddToCart(item)
+                    elseif action == "retrieve" then
+                        doRetrieveDirect(item)
                     elseif action == "add_fav" then
                         doAddFavorite(item)
                     elseif action == "rem_fav" then
@@ -846,23 +1163,22 @@ local function mainMenu()
                     end
                 end
                 redraw()
-            elseif selectedIdx == 2 then
+            elseif opt.text == "Favoris" then
                 favoritesInterface()
                 redraw()
-            elseif selectedIdx == 3 then
+            elseif opt.text == "Categories" then
                 categoriesInterface()
                 redraw()
-            elseif selectedIdx == 4 then
+            elseif opt.text == "Statistiques" then
                 statsInterface()
                 redraw()
-            elseif selectedIdx == 5 then
+            elseif opt.text == "Trier entree" then
                 emptyInputInterface()
                 redraw()
-            elseif selectedIdx == 6 then
+            elseif opt.text == "Quitter" then
                 running = false
             end
         elseif key == keys.backspace then
-            -- Sur menu principal, backspace = quitter
             running = false
         end
     end
