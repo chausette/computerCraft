@@ -669,45 +669,133 @@ local function doRetrieveCart()
         return
     end
     
-    clearScreen()
-    drawHeader("COMMANDE EN COURS")
-    
+    local maxRetries = 3
     local totalOrdered = 0
-    local errors = {}
+    local failedItems = {}
+    local pendingItems = {}
     
-    for i, item in ipairs(cart) do
-        local y = 3 + i
-        if y < h - 2 then
-            writeAt(2, y, item.displayName:sub(1, w - 10), colors_dim)
-            writeAt(w - 5, y, "...", colors_dim)
+    -- Copier le panier dans pending
+    for _, item in ipairs(cart) do
+        table.insert(pendingItems, {
+            name = item.name,
+            displayName = item.displayName,
+            count = item.count,
+            ordered = 0
+        })
+    end
+    
+    -- Essayer jusqu'à maxRetries fois
+    for attempt = 1, maxRetries do
+        if #pendingItems == 0 then
+            break
         end
         
-        local response = doRetrieveSingle(item, item.count)
-        
-        if response and response.success then
-            totalOrdered = totalOrdered + (response.data or item.count)
-            if y < h - 2 then
-                writeAt(w - 5, y, " OK ", colors_success)
-            end
+        clearScreen()
+        if attempt == 1 then
+            drawHeader("COMMANDE EN COURS")
         else
-            table.insert(errors, item.displayName)
-            if y < h - 2 then
-                writeAt(w - 5, y, "FAIL", colors_error)
-            end
+            drawHeader("RETRY " .. attempt .. "/" .. maxRetries)
         end
         
-        sleep(0.2)  -- Petit delai entre les requetes
+        local stillFailed = {}
+        
+        for i, item in ipairs(pendingItems) do
+            local y = 3 + i
+            local name = item.displayName
+            if #name > w - 12 then
+                name = name:sub(1, w - 15) .. ".."
+            end
+            
+            if y < h - 2 then
+                writeAt(2, y, name, colors_dim)
+                writeAt(w - 5, y, "...", colors_dim)
+            end
+            
+            local remaining = item.count - item.ordered
+            local response = doRetrieveSingle({name = item.name}, remaining)
+            
+            if response and response.success then
+                local got = response.data or remaining
+                item.ordered = item.ordered + got
+                totalOrdered = totalOrdered + got
+                
+                if y < h - 2 then
+                    writeAt(w - 5, y, " OK ", colors_success)
+                end
+            else
+                -- Echec, on le garde pour retry
+                table.insert(stillFailed, item)
+                if y < h - 2 then
+                    writeAt(w - 5, y, "FAIL", colors_error)
+                end
+            end
+            
+            sleep(0.3)
+        end
+        
+        pendingItems = stillFailed
+        
+        -- Si encore des echecs et pas le dernier essai, attendre
+        if #pendingItems > 0 and attempt < maxRetries then
+            writeAt(2, h - 3, "Attente avant retry...", colors_warning)
+            sleep(1)
+        end
+    end
+    
+    -- Les items encore en echec apres tous les retries
+    for _, item in ipairs(pendingItems) do
+        local remaining = item.count - item.ordered
+        if remaining > 0 then
+            table.insert(failedItems, {
+                name = item.displayName,
+                wanted = item.count,
+                got = item.ordered
+            })
+        end
     end
     
     -- Vider le panier
     clearCart()
     loadAllItems()
     
-    -- Afficher le resultat
-    if #errors == 0 then
-        showMessage("OK", totalOrdered .. " items envoyes!", false)
+    -- Afficher le resultat final
+    clearScreen()
+    
+    if #failedItems == 0 then
+        drawHeader("COMMANDE OK")
+        writeAt(2, 4, "Tous les items envoyes!", colors_success)
+        writeAt(2, 6, "Total: " .. totalOrdered .. " items", colors_accent)
+        drawFooter("Appuyez sur une touche...")
+        os.pullEvent("key")
     else
-        showMessage("ATTENTION", totalOrdered .. " items OK, " .. #errors .. " erreurs", true)
+        drawHeader("COMMANDE PARTIELLE")
+        
+        writeAt(2, 3, "Envoyes: " .. totalOrdered .. " items", colors_success)
+        writeAt(2, 4, "Echecs: " .. #failedItems .. " items", colors_error)
+        
+        writeAt(1, 6, string.rep("-", w), colors_dim)
+        writeAt(2, 7, "ITEMS NON ENVOYES:", colors_error)
+        
+        local y = 8
+        for i, fail in ipairs(failedItems) do
+            if y > h - 2 then
+                writeAt(2, y, "... et " .. (#failedItems - i + 1) .. " autres", colors_dim)
+                break
+            end
+            
+            local name = fail.name
+            if #name > w - 12 then
+                name = name:sub(1, w - 15) .. ".."
+            end
+            
+            local status = fail.got .. "/" .. fail.wanted
+            writeAt(2, y, name, colors_warning)
+            writeAt(w - #status, y, status, colors_error)
+            y = y + 1
+        end
+        
+        drawFooter("Appuyez sur une touche...")
+        os.pullEvent("key")
     end
 end
 
