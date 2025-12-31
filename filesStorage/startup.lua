@@ -19,6 +19,8 @@ local running = true
 local currentPage = "main"
 local inventoryPage = 1
 local lastActivity = os.clock()
+local connectedChests = {}  -- Liste des coffres connectés
+local totalPages = 1
 
 -- === INITIALISATION ===
 
@@ -82,13 +84,16 @@ local function updateDisplay()
             stats.uniqueItems = storage.countUniqueItems()
             
             if currentPage == "main" then
-                ui.drawMainPage(storage, stats)
+                ui.drawMainPageWithButtons(storage, stats)
             elseif currentPage == "inventory" then
                 local byCategory = storage.getByCategory()
-                ui.drawInventoryPage(byCategory, inventoryPage)
+                totalPages = ui.drawInventoryPageWithButtons(byCategory, inventoryPage)
             elseif currentPage == "favorites" then
                 local favorites = storage.getFavorites()
-                ui.drawFavoritesPage(favorites)
+                ui.drawFavoritesPageWithButtons(favorites)
+            elseif currentPage == "chests" then
+                connectedChests = storage.listConnectedChests()
+                ui.drawChestManagementPage(connectedChests, config.storage_chests)
             end
         end
         
@@ -107,6 +112,57 @@ local function autoSort()
         end
         
         sleep(5)
+    end
+end
+
+-- === GESTION TACTILE DU MONITEUR ===
+
+local function handleMonitorTouch()
+    while running do
+        local event, side, x, y = os.pullEvent("monitor_touch")
+        
+        -- Vérifie si c'est notre moniteur
+        if ui.monitor then
+            local action, data = ui.checkClick(x, y)
+            
+            if action then
+                print("[" .. os.date("%H:%M:%S") .. "] Touch: " .. action)
+                
+                -- Navigation
+                if action == "goto_main" then
+                    currentPage = "main"
+                elseif action == "goto_inventory" then
+                    currentPage = "inventory"
+                    inventoryPage = 1
+                elseif action == "goto_favorites" then
+                    currentPage = "favorites"
+                elseif action == "goto_chests" then
+                    currentPage = "chests"
+                    connectedChests = storage.listConnectedChests()
+                
+                -- Pagination
+                elseif action == "prev_page" then
+                    inventoryPage = math.max(1, inventoryPage - 1)
+                elseif action == "next_page" then
+                    inventoryPage = math.min(totalPages, inventoryPage + 1)
+                
+                -- Gestion des coffres
+                elseif action == "add_chest" then
+                    config.addChest(data, nil)
+                    storage.scanAll()
+                    print("  Coffre ajoute: " .. data)
+                elseif action == "remove_chest" then
+                    config.removeChest(data)
+                    storage.scanAll()
+                    print("  Coffre supprime: " .. data)
+                
+                -- Actions
+                elseif action == "sort_input" then
+                    local sorted = storage.sortInputChest()
+                    print("  Tri manuel: " .. sorted .. " items")
+                end
+            end
+        end
     end
 end
 
@@ -130,6 +186,8 @@ local function handleLocalInput()
                 inventoryPage = 1
             elseif currentPage == "inventory" then
                 currentPage = "favorites"
+            elseif currentPage == "favorites" then
+                currentPage = "chests"
             else
                 currentPage = "main"
             end
@@ -173,7 +231,8 @@ local function main()
     print("  [S] Forcer le tri")
     print("  [<][>] Navigation pages")
     print("")
-    print("En attente de connexions...")
+    print("MONITEUR TACTILE ACTIF")
+    print("  Touchez les boutons a l'ecran")
     print("----------------------------------------")
     
     -- Lance les tâches parallèles
@@ -181,7 +240,8 @@ local function main()
         handleNetworkRequests,
         updateDisplay,
         autoSort,
-        handleLocalInput
+        handleLocalInput,
+        handleMonitorTouch
     )
     
     -- Nettoyage

@@ -11,6 +11,8 @@ ui.width = 0
 ui.height = 0
 ui.currentPage = "main"
 ui.scrollOffset = 0
+ui.buttons = {}  -- Stocke les boutons cliquables
+ui.selectedChest = nil  -- Coffre sélectionné pour action
 
 -- === COULEURS DU THEME ===
 ui.theme = {
@@ -417,7 +419,8 @@ function ui.drawLoading(message)
     
     -- Animation simple
     local frames = {"|", "/", "-", "\\"}
-    local frame = frames[(os.clock() * 4) % 4 + 1]
+    local frameIndex = math.floor(os.clock() * 4) % 4 + 1
+    local frame = frames[frameIndex] or "|"
     ui.writeCentered(math.floor(ui.height / 2) + 2, "[ " .. frame .. " ]", ui.theme.textDim)
 end
 
@@ -426,6 +429,310 @@ function ui.drawError(message)
     ui.clear()
     ui.drawHeader("ERREUR", nil)
     ui.writeCentered(math.floor(ui.height / 2), message, ui.theme.error)
+end
+
+-- === SYSTEME DE BOUTONS ===
+
+-- Réinitialise les boutons
+function ui.clearButtons()
+    ui.buttons = {}
+end
+
+-- Ajoute un bouton
+function ui.addButton(x, y, w, h, text, action, data)
+    table.insert(ui.buttons, {
+        x = x, y = y, w = w, h = h,
+        text = text,
+        action = action,
+        data = data
+    })
+end
+
+-- Dessine un bouton
+function ui.drawButton(x, y, w, text, fg, bg)
+    local padding = math.floor((w - #text) / 2)
+    ui.setColor(fg or ui.theme.text, bg or ui.theme.accent)
+    ui.monitor.setCursorPos(x, y)
+    ui.monitor.write(string.rep(" ", w))
+    ui.monitor.setCursorPos(x + padding, y)
+    ui.monitor.write(text)
+    ui.setColor(ui.theme.text, ui.theme.background)
+end
+
+-- Vérifie si un clic touche un bouton
+function ui.checkClick(clickX, clickY)
+    for _, btn in ipairs(ui.buttons) do
+        if clickX >= btn.x and clickX < btn.x + btn.w and
+           clickY >= btn.y and clickY < btn.y + btn.h then
+            return btn.action, btn.data
+        end
+    end
+    return nil, nil
+end
+
+-- === PAGE DE GESTION DES COFFRES ===
+
+function ui.drawChestManagementPage(connectedChests, storageChests)
+    ui.clear()
+    ui.clearButtons()
+    ui.drawHeader("GESTION COFFRES", "Touchez pour gerer")
+    
+    local y = 4
+    
+    -- Boutons de navigation
+    ui.drawButton(2, y, 10, "< RETOUR", ui.theme.text, ui.theme.border)
+    ui.addButton(2, y, 10, 1, "RETOUR", "goto_main", nil)
+    
+    y = y + 2
+    
+    -- Section: Coffres de stockage actifs
+    ui.write(2, y, "COFFRES ACTIFS:", ui.theme.accent)
+    y = y + 1
+    
+    local activeCount = 0
+    for _, sc in ipairs(storageChests) do
+        if y > ui.height - 4 then break end
+        activeCount = activeCount + 1
+        
+        local name = sc.name
+        if #name > ui.width - 15 then
+            name = ".." .. name:sub(-(ui.width - 17))
+        end
+        
+        ui.write(2, y, name, ui.theme.text)
+        
+        -- Bouton supprimer
+        local btnX = ui.width - 5
+        ui.drawButton(btnX, y, 5, " X ", ui.theme.text, ui.theme.error)
+        ui.addButton(btnX, y, 5, 1, "X", "remove_chest", sc.name)
+        
+        y = y + 1
+    end
+    
+    if activeCount == 0 then
+        ui.write(2, y, "(aucun)", ui.theme.textDim)
+        y = y + 1
+    end
+    
+    y = y + 1
+    
+    -- Section: Coffres disponibles (non utilisés)
+    ui.write(2, y, "COFFRES DISPONIBLES:", ui.theme.success)
+    y = y + 1
+    
+    local availableCount = 0
+    for _, chest in ipairs(connectedChests) do
+        if not chest.isUsed and y > ui.height - 2 then break end
+        if not chest.isUsed then
+            availableCount = availableCount + 1
+            
+            local name = chest.name
+            if #name > ui.width - 15 then
+                name = ".." .. name:sub(-(ui.width - 17))
+            end
+            
+            ui.write(2, y, name, ui.theme.textDim)
+            
+            -- Bouton ajouter
+            local btnX = ui.width - 5
+            ui.drawButton(btnX, y, 5, " + ", ui.theme.text, ui.theme.success)
+            ui.addButton(btnX, y, 5, 1, "+", "add_chest", chest.name)
+            
+            y = y + 1
+        end
+    end
+    
+    if availableCount == 0 then
+        ui.write(2, y, "(aucun)", ui.theme.textDim)
+    end
+    
+    -- Pied de page
+    ui.fillLine(ui.height, " ", ui.theme.textDim, ui.theme.headerBg)
+    ui.write(2, ui.height, "Touchez + ou X", ui.theme.textDim, ui.theme.headerBg)
+end
+
+-- === MISE A JOUR PAGE PRINCIPALE AVEC BOUTONS ===
+
+-- Page principale avec statistiques et boutons de navigation
+function ui.drawMainPageWithButtons(storage, stats)
+    ui.clear()
+    ui.clearButtons()
+    ui.drawHeader("SYSTEME DE STOCKAGE", os.date("%H:%M:%S"))
+    
+    local y = 5
+    
+    -- Statistiques générales
+    ui.write(2, y, "STATISTIQUES", ui.theme.accent)
+    y = y + 2
+    
+    ui.write(2, y, "Items totaux:", ui.theme.textDim)
+    ui.write(18, y, tostring(stats.totalItems), ui.theme.text)
+    y = y + 1
+    
+    ui.write(2, y, "Types uniques:", ui.theme.textDim)
+    ui.write(18, y, tostring(stats.uniqueItems), ui.theme.text)
+    y = y + 1
+    
+    ui.write(2, y, "Slots utilises:", ui.theme.textDim)
+    ui.write(18, y, stats.usedSlots .. "/" .. stats.totalSlots, ui.theme.text)
+    y = y + 2
+    
+    -- Barre de capacité
+    ui.write(2, y, "Capacite:", ui.theme.textDim)
+    y = y + 1
+    local fillColor = ui.theme.success
+    local fillPercent = stats.usedSlots / math.max(stats.totalSlots, 1)
+    if fillPercent > 0.9 then
+        fillColor = ui.theme.error
+    elseif fillPercent > 0.7 then
+        fillColor = ui.theme.warning
+    end
+    ui.drawProgressBar(2, y, math.min(ui.width - 10, 30), stats.usedSlots, math.max(stats.totalSlots, 1), fillColor)
+    
+    y = y + 3
+    
+    -- Alertes
+    local alerts = storage.checkAlerts()
+    if #alerts > 0 then
+        ui.write(2, y, "ALERTES STOCK", ui.theme.warning)
+        y = y + 1
+        ui.fillLine(y, "-", ui.theme.border)
+        y = y + 1
+        
+        for _, alert in ipairs(alerts) do
+            ui.write(2, y, alert.displayName, ui.theme.warning)
+            ui.write(ui.width - 10, y, alert.current .. "/" .. alert.minimum, ui.theme.error)
+            y = y + 1
+            if y > ui.height - 5 then break end
+        end
+    end
+    
+    -- Boutons de navigation en bas
+    local btnY = ui.height - 2
+    local btnWidth = math.floor((ui.width - 4) / 4)
+    
+    -- Bouton Inventaire
+    ui.drawButton(2, btnY, btnWidth, "INVENT", ui.theme.text, ui.theme.accent)
+    ui.addButton(2, btnY, btnWidth, 1, "INVENT", "goto_inventory", nil)
+    
+    -- Bouton Favoris
+    ui.drawButton(2 + btnWidth + 1, btnY, btnWidth, "FAVORIS", ui.theme.text, ui.theme.accent)
+    ui.addButton(2 + btnWidth + 1, btnY, btnWidth, 1, "FAVORIS", "goto_favorites", nil)
+    
+    -- Bouton Coffres
+    ui.drawButton(2 + (btnWidth + 1) * 2, btnY, btnWidth, "COFFRES", ui.theme.text, ui.theme.success)
+    ui.addButton(2 + (btnWidth + 1) * 2, btnY, btnWidth, 1, "COFFRES", "goto_chests", nil)
+    
+    -- Bouton Tri
+    ui.drawButton(2 + (btnWidth + 1) * 3, btnY, btnWidth, "TRIER", ui.theme.text, ui.theme.warning)
+    ui.addButton(2 + (btnWidth + 1) * 3, btnY, btnWidth, 1, "TRIER", "sort_input", nil)
+    
+    -- Pied de page
+    ui.fillLine(ui.height, " ", ui.theme.textDim, ui.theme.headerBg)
+    local timestamp = "Maj: " .. os.date("%H:%M:%S")
+    ui.write(ui.width - #timestamp, ui.height, timestamp, ui.theme.textDim, ui.theme.headerBg)
+end
+
+-- Page inventaire avec bouton retour
+function ui.drawInventoryPageWithButtons(byCategory, pageNum)
+    ui.clear()
+    ui.clearButtons()
+    ui.drawHeader("INVENTAIRE", "Page " .. pageNum)
+    
+    -- Bouton retour
+    ui.drawButton(2, 4, 10, "< RETOUR", ui.theme.text, ui.theme.border)
+    ui.addButton(2, 4, 10, 1, "RETOUR", "goto_main", nil)
+    
+    local y = 6
+    local categoriesPerPage = 2
+    local itemsPerCategory = 4
+    
+    -- Calcule les catégories à afficher
+    local categories = {}
+    for _, cat in ipairs(config.categories) do
+        if byCategory[cat.name] and #byCategory[cat.name].items > 0 then
+            table.insert(categories, {
+                name = cat.name,
+                color = cat.color,
+                items = byCategory[cat.name].items
+            })
+        end
+    end
+    
+    local startIdx = (pageNum - 1) * categoriesPerPage + 1
+    local endIdx = math.min(startIdx + categoriesPerPage - 1, #categories)
+    
+    for i = startIdx, endIdx do
+        local cat = categories[i]
+        if cat and y < ui.height - 4 then
+            local lines = ui.drawCategorySection(y, cat, cat.items, itemsPerCategory)
+            y = y + lines + 2
+        end
+    end
+    
+    -- Navigation
+    local totalPages = math.ceil(#categories / categoriesPerPage)
+    local btnY = ui.height - 2
+    
+    if pageNum > 1 then
+        ui.drawButton(2, btnY, 8, "< PREC", ui.theme.text, ui.theme.accent)
+        ui.addButton(2, btnY, 8, 1, "PREC", "prev_page", nil)
+    end
+    
+    if pageNum < totalPages then
+        ui.drawButton(ui.width - 9, btnY, 8, "SUIV >", ui.theme.text, ui.theme.accent)
+        ui.addButton(ui.width - 9, btnY, 8, 1, "SUIV", "next_page", nil)
+    end
+    
+    ui.fillLine(ui.height, " ", ui.theme.textDim, ui.theme.headerBg)
+    ui.writeCentered(ui.height, "Page " .. pageNum .. "/" .. totalPages, 
+                     ui.theme.textDim, ui.theme.headerBg)
+    
+    return totalPages
+end
+
+-- Page favoris avec bouton retour
+function ui.drawFavoritesPageWithButtons(favorites)
+    ui.clear()
+    ui.clearButtons()
+    ui.drawHeader("FAVORIS", #favorites .. " items")
+    
+    -- Bouton retour
+    ui.drawButton(2, 4, 10, "< RETOUR", ui.theme.text, ui.theme.border)
+    ui.addButton(2, 4, 10, 1, "RETOUR", "goto_main", nil)
+    
+    local y = 6
+    
+    if #favorites == 0 then
+        ui.writeCentered(y + 2, "Aucun favori configure", ui.theme.textDim)
+        ui.writeCentered(y + 4, "Ajoutez via le Pocket", ui.theme.textDim)
+        return
+    end
+    
+    for i, fav in ipairs(favorites) do
+        if y > ui.height - 2 then break end
+        
+        local name = fav.displayName
+        local maxLen = ui.width - 12
+        if #name > maxLen then
+            name = name:sub(1, maxLen - 2) .. ".."
+        end
+        
+        local color = ui.theme.text
+        local star = "*"
+        if not fav.inStock then
+            color = ui.theme.error
+            star = "!"
+        elseif fav.count < 10 then
+            color = ui.theme.warning
+        end
+        
+        ui.write(2, y, star, ui.theme.accent)
+        ui.write(4, y, name, color)
+        ui.write(ui.width - #tostring(fav.count), y, tostring(fav.count), ui.theme.accent)
+        
+        y = y + 1
+    end
 end
 
 return ui

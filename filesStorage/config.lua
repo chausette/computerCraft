@@ -7,10 +7,10 @@ local config = {}
 
 -- === NOMS DES PERIPHERIQUES ===
 -- Modifiez selon votre installation
-config.INPUT_CHEST = "minecraft:chest_0"      -- Coffre d'entrée
-config.OUTPUT_CHEST = "minecraft:chest_1"     -- Coffre de sortie
-config.MODEM_SIDE = "back"                    -- Côté du modem sans fil
-config.MONITOR_NAME = "monitor_0"             -- Moniteur principal
+config.INPUT_CHEST = "minecraft:chest_5"      -- Coffre d'entrée
+config.OUTPUT_CHEST = "minecraft:chest_6"     -- Coffre de sortie
+config.MODEM_SIDE = "right"                   -- Côté du modem sans fil
+config.MONITOR_NAME = "monitor_3"             -- Moniteur principal
 
 -- === PROTOCOLE RESEAU ===
 config.PROTOCOL = "storage_system"
@@ -114,14 +114,11 @@ config.favorites = {
 }
 
 -- === COFFRES DE STOCKAGE ===
--- Liste des coffres de stockage (ajoutez-en selon vos besoins)
--- Format: {name = "nom_peripherique", category = "nom_categorie" ou nil pour auto}
+-- Liste des coffres de stockage (gerez via l'interface moniteur)
+-- Ou ajoutez manuellement ici
 config.storage_chests = {
-    {name = "minecraft:chest_2", category = nil},
-    {name = "minecraft:chest_3", category = nil},
-    {name = "minecraft:chest_4", category = nil},
-    {name = "minecraft:chest_5", category = nil},
-    -- Ajoutez d'autres coffres ici
+    -- Les coffres seront ajoutes via l'interface tactile
+    -- Ou ajoutez manuellement: {name = "minecraft:chest_0", category = nil},
 }
 
 -- === PARAMETRES D'AFFICHAGE ===
