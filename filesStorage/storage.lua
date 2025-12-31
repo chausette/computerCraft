@@ -179,32 +179,71 @@ end
 
 -- === TRANSFERT D'ITEMS ===
 
+-- Vérifie si un coffre accepte un item
+function storage.chestAcceptsItem(chestConfig, itemName, itemCategory)
+    -- Si le coffre est verrouillé sur un item spécifique
+    if chestConfig.itemLock then
+        return chestConfig.itemLock == itemName
+    end
+    
+    -- Si le coffre est restreint à une catégorie
+    if chestConfig.category then
+        return chestConfig.category == itemCategory
+    end
+    
+    -- Pas de restriction
+    return true
+end
+
 -- Trouve le meilleur coffre pour stocker un item
 function storage.findStorageChest(itemName)
     local category = storage.getCategory(itemName)
     
-    -- D'abord, cherche un coffre qui contient déjà cet item
+    -- D'abord, cherche un coffre verrouillé sur cet item avec de la place
     for _, chestConfig in ipairs(config.storage_chests) do
-        local chest = peripheral.wrap(chestConfig.name)
-        if chest then
-            local items = chest.list()
-            for slot, item in pairs(items) do
-                if item.name == itemName and item.count < 64 then
-                    return chestConfig.name, slot
+        if chestConfig.itemLock == itemName then
+            local chest = peripheral.wrap(chestConfig.name)
+            if chest then
+                local items = chest.list()
+                local size = chest.size()
+                -- Cherche un slot avec cet item ou vide
+                for slot = 1, size do
+                    if not items[slot] then
+                        return chestConfig.name, slot
+                    elseif items[slot].name == itemName and items[slot].count < 64 then
+                        return chestConfig.name, slot
+                    end
                 end
             end
         end
     end
     
-    -- Sinon, cherche un coffre avec de la place
+    -- Ensuite, cherche un coffre de la bonne catégorie qui contient déjà cet item
     for _, chestConfig in ipairs(config.storage_chests) do
-        local chest = peripheral.wrap(chestConfig.name)
-        if chest then
-            local items = chest.list()
-            local size = chest.size()
-            for slot = 1, size do
-                if not items[slot] then
-                    return chestConfig.name, slot
+        if storage.chestAcceptsItem(chestConfig, itemName, category) then
+            local chest = peripheral.wrap(chestConfig.name)
+            if chest then
+                local items = chest.list()
+                for slot, item in pairs(items) do
+                    if item.name == itemName and item.count < 64 then
+                        return chestConfig.name, slot
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Sinon, cherche un coffre de la bonne catégorie avec de la place
+    for _, chestConfig in ipairs(config.storage_chests) do
+        if storage.chestAcceptsItem(chestConfig, itemName, category) then
+            local chest = peripheral.wrap(chestConfig.name)
+            if chest then
+                local items = chest.list()
+                local size = chest.size()
+                for slot = 1, size do
+                    if not items[slot] then
+                        return chestConfig.name, slot
+                    end
                 end
             end
         end
@@ -353,17 +392,35 @@ function storage.listConnectedChests()
         if pType and (pType:find("chest") or pType:find("barrel") or 
                       pType:find("shulker") or pType == "inventory") then
             local isUsed = false
+            local isSystem = false
+            local category = nil
+            local itemLock = nil
             
             -- Vérifie si c'est un coffre système
             if name == config.INPUT_CHEST or name == config.OUTPUT_CHEST then
+                isSystem = true
                 isUsed = true
             end
             
-            -- Vérifie si c'est un coffre de stockage
+            -- Vérifie si c'est un coffre de stockage et récupère ses infos
             for _, sc in ipairs(config.storage_chests) do
                 if sc.name == name then
                     isUsed = true
+                    category = sc.category
+                    itemLock = sc.itemLock
                     break
+                end
+            end
+            
+            -- Compte les slots utilisés
+            local chest = peripheral.wrap(name)
+            local size = 0
+            local used = 0
+            if chest then
+                size = chest.size() or 0
+                local items = chest.list()
+                for _ in pairs(items) do
+                    used = used + 1
                 end
             end
             
@@ -371,11 +428,17 @@ function storage.listConnectedChests()
                 name = name,
                 type = pType,
                 isUsed = isUsed,
-                size = peripheral.call(name, "size")
+                isSystem = isSystem,
+                isStorage = isUsed and not isSystem,
+                size = size,
+                used = used,
+                category = category,
+                itemLock = itemLock
             })
         end
     end
     
+    table.sort(chests, function(a, b) return a.name < b.name end)
     return chests
 end
 

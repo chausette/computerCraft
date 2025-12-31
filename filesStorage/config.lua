@@ -114,11 +114,13 @@ config.favorites = {
 }
 
 -- === COFFRES DE STOCKAGE ===
--- Liste des coffres de stockage (gerez via l'interface moniteur)
--- Ou ajoutez manuellement ici
+-- Liste des coffres de stockage (gerez via l'interface moniteur ou pocket)
+-- Format: {name = "nom", category = "categorie" ou nil, itemLock = "item_name" ou nil}
+-- category = restreint a une categorie
+-- itemLock = restreint a un seul item
 config.storage_chests = {
-    -- Les coffres seront ajoutes via l'interface tactile
-    -- Ou ajoutez manuellement: {name = "minecraft:chest_0", category = nil},
+    -- Les coffres seront ajoutes via l'interface
+    -- Exemple: {name = "minecraft:chest_0", category = nil, itemLock = nil},
 }
 
 -- === PARAMETRES D'AFFICHAGE ===
@@ -170,9 +172,32 @@ function config.load()
 end
 
 -- Ajoute un coffre de stockage
-function config.addChest(name, category)
-    table.insert(config.storage_chests, {name = name, category = category})
+function config.addChest(name, category, itemLock)
+    table.insert(config.storage_chests, {name = name, category = category, itemLock = itemLock})
     config.save()
+end
+
+-- Met à jour les restrictions d'un coffre
+function config.updateChestRestriction(name, category, itemLock)
+    for _, chest in ipairs(config.storage_chests) do
+        if chest.name == name then
+            chest.category = category
+            chest.itemLock = itemLock
+            config.save()
+            return true
+        end
+    end
+    return false
+end
+
+-- Obtient les infos d'un coffre
+function config.getChestInfo(name)
+    for _, chest in ipairs(config.storage_chests) do
+        if chest.name == name then
+            return chest
+        end
+    end
+    return nil
 end
 
 -- Supprime un coffre de stockage

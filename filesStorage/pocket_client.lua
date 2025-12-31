@@ -1142,6 +1142,372 @@ local function statsInterface()
     os.pullEvent("key")
 end
 
+-- === MENU GESTION COFFRES ===
+
+local function chestDetailInterface(chest)
+    local selectedOption = 1
+    
+    local function getOptions()
+        local opts = {}
+        
+        if chest.isStorage then
+            -- Coffre actif - options de modification
+            if chest.category then
+                table.insert(opts, {text = "Retirer filtre categorie", action = "clear_cat"})
+            else
+                table.insert(opts, {text = "Filtrer par categorie", action = "set_cat"})
+            end
+            
+            if chest.itemLock then
+                table.insert(opts, {text = "Retirer filtre item", action = "clear_item"})
+            else
+                table.insert(opts, {text = "Filtrer par item", action = "set_item"})
+            end
+            
+            table.insert(opts, {text = "Retirer du stockage", action = "remove"})
+        else
+            -- Coffre disponible - ajouter
+            table.insert(opts, {text = "Ajouter au stockage", action = "add"})
+            table.insert(opts, {text = "Ajouter avec categorie", action = "add_cat"})
+            table.insert(opts, {text = "Ajouter avec item", action = "add_item"})
+        end
+        
+        table.insert(opts, {text = "Retour", action = "back"})
+        return opts
+    end
+    
+    local function redraw()
+        local options = getOptions()
+        clearScreen()
+        
+        local title = chest.name
+        if #title > w then title = ".." .. title:sub(-(w-2)) end
+        drawHeader(title)
+        
+        local y = 3
+        writeAt(2, y, "Slots: " .. chest.used .. "/" .. chest.size, colors_dim)
+        y = y + 1
+        
+        if chest.isSystem then
+            writeAt(2, y, "COFFRE SYSTEME", colors_warning)
+            y = y + 1
+        elseif chest.isStorage then
+            writeAt(2, y, "STOCKAGE ACTIF", colors_success)
+            y = y + 1
+            
+            if chest.category then
+                writeAt(2, y, "Cat: " .. chest.category, colors_accent)
+                y = y + 1
+            end
+            if chest.itemLock then
+                local itemName = storage.getDisplayName and storage.getDisplayName(chest.itemLock) or chest.itemLock:gsub("^[^:]+:", "")
+                writeAt(2, y, "Item: " .. itemName, colors_cart)
+                y = y + 1
+            end
+            if not chest.category and not chest.itemLock then
+                writeAt(2, y, "Pas de restriction", colors_dim)
+                y = y + 1
+            end
+        else
+            writeAt(2, y, "DISPONIBLE", colors_dim)
+            y = y + 1
+        end
+        
+        writeAt(1, y + 1, string.rep("-", w), colors_dim)
+        y = y + 2
+        
+        for i, opt in ipairs(options) do
+            local isSelected = (i == selectedOption)
+            
+            if isSelected then
+                term.setCursorPos(1, y)
+                term.setBackgroundColor(colors_selected)
+                term.write(string.rep(" ", w))
+                writeAt(2, y, "> " .. opt.text, colors_text, colors_selected)
+            else
+                writeAt(2, y, "  " .. opt.text, colors_dim)
+            end
+            y = y + 1
+        end
+        
+        term.setBackgroundColor(colors_bg)
+        drawFooter("^v:Nav Enter:Ok Bksp:Ret")
+    end
+    
+    redraw()
+    
+    while true do
+        local event, key = os.pullEvent("key")
+        local options = getOptions()
+        
+        if key == keys.up then
+            selectedOption = selectedOption > 1 and selectedOption - 1 or #options
+            redraw()
+        elseif key == keys.down then
+            selectedOption = selectedOption < #options and selectedOption + 1 or 1
+            redraw()
+        elseif key == keys.enter then
+            return options[selectedOption].action
+        elseif key == keys.backspace then
+            return "back"
+        end
+    end
+end
+
+local function selectCategoryInterface()
+    local response = sendRequest({type = "get_categories"})
+    if not response or not response.success then
+        showMessage("ERREUR", "Impossible de charger", true)
+        return nil
+    end
+    
+    local categories = response.data
+    local selectedIdx = 1
+    local scrollOffset = 0
+    local maxVisible = h - 4
+    
+    local function redraw()
+        clearScreen()
+        drawHeader("CHOISIR CATEGORIE")
+        
+        for i = 1, maxVisible do
+            local idx = scrollOffset + i
+            local cat = categories[idx]
+            
+            if cat then
+                local y = 2 + i
+                local isSelected = (idx == selectedIdx)
+                
+                if isSelected then
+                    term.setCursorPos(1, y)
+                    term.setBackgroundColor(colors_selected)
+                    term.write(string.rep(" ", w))
+                end
+                
+                writeAt(2, y, cat.name, colors_text, isSelected and colors_selected or colors_bg)
+            end
+        end
+        
+        term.setBackgroundColor(colors_bg)
+        drawFooter("^v:Nav Enter:Ok Bksp:Annul")
+    end
+    
+    redraw()
+    
+    while true do
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            if selectedIdx > 1 then
+                selectedIdx = selectedIdx - 1
+                if selectedIdx <= scrollOffset then
+                    scrollOffset = scrollOffset - 1
+                end
+            end
+            redraw()
+        elseif key == keys.down then
+            if selectedIdx < #categories then
+                selectedIdx = selectedIdx + 1
+                if selectedIdx > scrollOffset + maxVisible then
+                    scrollOffset = scrollOffset + 1
+                end
+            end
+            redraw()
+        elseif key == keys.enter then
+            return categories[selectedIdx].name
+        elseif key == keys.backspace then
+            return nil
+        end
+    end
+end
+
+local function selectItemInterface()
+    -- Utilise la recherche existante pour choisir un item
+    loadAllItems()
+    local item = searchInterface()
+    if item then
+        return item.name
+    end
+    return nil
+end
+
+local function chestsInterface()
+    local selectedIdx = 1
+    local scrollOffset = 0
+    local maxVisible = h - 5
+    local chests = {}
+    
+    local function loadChests()
+        local response = sendRequest({type = "list_chests"})
+        if response and response.success then
+            chests = response.data
+            -- Trier: système d'abord, puis actifs, puis disponibles
+            table.sort(chests, function(a, b)
+                if a.isSystem ~= b.isSystem then return a.isSystem end
+                if a.isStorage ~= b.isStorage then return a.isStorage end
+                return a.name < b.name
+            end)
+        end
+    end
+    
+    loadChests()
+    
+    local function redraw()
+        clearScreen()
+        drawHeader("GESTION COFFRES")
+        
+        if #chests == 0 then
+            writeAt(2, 4, "Aucun coffre trouve", colors_dim)
+            drawFooter("Bksp:Retour")
+            return
+        end
+        
+        writeAt(1, 2, string.rep("-", w), colors_dim)
+        
+        local startY = 3
+        
+        for i = 1, maxVisible do
+            local idx = scrollOffset + i
+            local chest = chests[idx]
+            
+            if chest then
+                local y = startY + i - 1
+                local isSelected = (idx == selectedIdx)
+                
+                if isSelected then
+                    term.setCursorPos(1, y)
+                    term.setBackgroundColor(colors_selected)
+                    term.write(string.rep(" ", w))
+                end
+                
+                -- Icone de statut
+                local icon = " "
+                local iconColor = colors_dim
+                if chest.isSystem then
+                    icon = "S"
+                    iconColor = colors_warning
+                elseif chest.isStorage then
+                    if chest.itemLock then
+                        icon = "I"
+                        iconColor = colors_cart
+                    elseif chest.category then
+                        icon = "C"
+                        iconColor = colors_accent
+                    else
+                        icon = "*"
+                        iconColor = colors_success
+                    end
+                end
+                
+                writeAt(1, y, icon, iconColor, isSelected and colors_selected or colors_bg)
+                
+                -- Nom du coffre (tronqué)
+                local name = chest.name
+                local maxLen = w - 8
+                if #name > maxLen then
+                    name = ".." .. name:sub(-(maxLen - 2))
+                end
+                
+                writeAt(3, y, name, colors_text, isSelected and colors_selected or colors_bg)
+                
+                -- Slots
+                local slotsStr = chest.used .. "/" .. chest.size
+                writeAt(w - #slotsStr, y, slotsStr, colors_dim, isSelected and colors_selected or colors_bg)
+            end
+        end
+        
+        term.setBackgroundColor(colors_bg)
+        
+        -- Légende
+        writeAt(1, h - 2, "S=Sys *=Actif C=Cat I=Item", colors_dim)
+        
+        local info = selectedIdx .. "/" .. #chests
+        drawFooter("^v:Nav Enter:Detail Bksp:Ret")
+    end
+    
+    redraw()
+    
+    while true do
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            if selectedIdx > 1 then
+                selectedIdx = selectedIdx - 1
+                if selectedIdx <= scrollOffset then
+                    scrollOffset = scrollOffset - 1
+                end
+            end
+            redraw()
+        elseif key == keys.down then
+            if selectedIdx < #chests then
+                selectedIdx = selectedIdx + 1
+                if selectedIdx > scrollOffset + maxVisible then
+                    scrollOffset = scrollOffset + 1
+                end
+            end
+            redraw()
+        elseif key == keys.enter then
+            local chest = chests[selectedIdx]
+            if chest and not chest.isSystem then
+                local action = chestDetailInterface(chest)
+                
+                if action == "add" then
+                    sendRequest({type = "add_chest", chestName = chest.name})
+                    showMessage("OK", "Coffre ajoute!", false)
+                    
+                elseif action == "add_cat" then
+                    local cat = selectCategoryInterface()
+                    if cat then
+                        sendRequest({type = "add_chest", chestName = chest.name, category = cat})
+                        showMessage("OK", "Coffre ajoute avec filtre!", false)
+                    end
+                    
+                elseif action == "add_item" then
+                    local itemName = selectItemInterface()
+                    if itemName then
+                        sendRequest({type = "add_chest", chestName = chest.name, itemLock = itemName})
+                        showMessage("OK", "Coffre ajoute avec filtre!", false)
+                    end
+                    
+                elseif action == "remove" then
+                    sendRequest({type = "remove_chest", chestName = chest.name})
+                    showMessage("OK", "Coffre retire!", false)
+                    
+                elseif action == "set_cat" then
+                    local cat = selectCategoryInterface()
+                    if cat then
+                        sendRequest({type = "update_chest", chestName = chest.name, category = cat, itemLock = nil})
+                        showMessage("OK", "Filtre applique!", false)
+                    end
+                    
+                elseif action == "clear_cat" then
+                    sendRequest({type = "update_chest", chestName = chest.name, category = nil, itemLock = chest.itemLock})
+                    showMessage("OK", "Filtre retire!", false)
+                    
+                elseif action == "set_item" then
+                    local itemName = selectItemInterface()
+                    if itemName then
+                        sendRequest({type = "update_chest", chestName = chest.name, category = nil, itemLock = itemName})
+                        showMessage("OK", "Filtre applique!", false)
+                    end
+                    
+                elseif action == "clear_item" then
+                    sendRequest({type = "update_chest", chestName = chest.name, category = chest.category, itemLock = nil})
+                    showMessage("OK", "Filtre retire!", false)
+                end
+                
+                loadChests()
+                selectedIdx = math.min(selectedIdx, #chests)
+            elseif chest and chest.isSystem then
+                showMessage("INFO", "Coffre systeme non modifiable", false)
+            end
+            redraw()
+        elseif key == keys.backspace then
+            return
+        end
+    end
+end
+
 -- === VIDER ENTREE ===
 
 local function emptyInputInterface()
@@ -1171,6 +1537,7 @@ local function mainMenu()
             {text = "Rechercher"},
             {text = "Favoris"},
             {text = "Categories"},
+            {text = "Gestion Coffres"},
             {text = "Statistiques"},
             {text = "Trier entree"},
             {text = "Quitter"}
@@ -1194,6 +1561,7 @@ local function mainMenu()
         
         for i, opt in ipairs(options) do
             local y = 2 + i * 2
+            if y > h - 2 then break end
             local isSelected = (i == selectedIdx)
             
             if isSelected then
@@ -1256,6 +1624,9 @@ local function mainMenu()
                 redraw()
             elseif opt.text == "Categories" then
                 categoriesInterface()
+                redraw()
+            elseif opt.text == "Gestion Coffres" then
+                chestsInterface()
                 redraw()
             elseif opt.text == "Statistiques" then
                 statsInterface()

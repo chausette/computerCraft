@@ -108,6 +108,8 @@ network.REQUEST = {
     REMOVE_FAVORITE = "remove_favorite",
     ADD_CHEST = "add_chest",
     REMOVE_CHEST = "remove_chest",
+    UPDATE_CHEST = "update_chest",
+    GET_CHEST_INFO = "get_chest_info",
     LIST_CHESTS = "list_chests",
     GET_CATEGORIES = "get_categories",
     ADD_CATEGORY = "add_category",
@@ -193,7 +195,7 @@ function network.handleRequest(storage, request)
         }
         
     elseif request.type == network.REQUEST.ADD_CHEST then
-        config.addChest(request.chestName, request.category)
+        config.addChest(request.chestName, request.category, request.itemLock)
         storage.scanAll()
         response = {success = true}
         
@@ -203,6 +205,24 @@ function network.handleRequest(storage, request)
         response = {
             success = ok,
             error = ok and nil or "Coffre non trouvé"
+        }
+    
+    elseif request.type == network.REQUEST.UPDATE_CHEST then
+        local ok = config.updateChestRestriction(request.chestName, request.category, request.itemLock)
+        if ok then
+            storage.scanAll()
+        end
+        response = {
+            success = ok,
+            error = ok and nil or "Coffre non trouvé"
+        }
+    
+    elseif request.type == network.REQUEST.GET_CHEST_INFO then
+        local info = config.getChestInfo(request.chestName)
+        response = {
+            success = info ~= nil,
+            data = info,
+            error = info and nil or "Coffre non trouvé"
         }
         
     elseif request.type == network.REQUEST.LIST_CHESTS then
