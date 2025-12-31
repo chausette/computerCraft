@@ -1,21 +1,16 @@
 -- ============================================
 -- CLIENT POCKET - CONTROLE DU STOCKAGE
--- Placez ce fichier dans le Pocket Computer
 -- ============================================
 
--- Configuration réseau
 local PROTOCOL = "storage_system"
 local SERVER_ID = "storage_server"
 
--- Variables
 local serverId = nil
 local running = true
-local currentMenu = "main"
 
 -- === FONCTIONS RESEAU ===
 
 local function initNetwork()
-    -- Cherche un modem
     local modemSide = nil
     for _, side in ipairs({"top", "bottom", "left", "right", "front", "back"}) do
         if peripheral.getType(side) == "modem" then
@@ -29,8 +24,6 @@ local function initNetwork()
     end
     
     rednet.open(modemSide)
-    
-    -- Cherche le serveur
     serverId = rednet.lookup(PROTOCOL, SERVER_ID)
     
     if not serverId then
@@ -46,7 +39,6 @@ local function sendRequest(request)
     end
     
     rednet.send(serverId, request, PROTOCOL)
-    
     local sender, response = rednet.receive(PROTOCOL, 5)
     
     if sender == serverId then
@@ -67,7 +59,6 @@ local function printHeader(title)
     clearScreen()
     local w, h = term.getSize()
     print(string.rep("=", w))
-    
     local padding = math.floor((w - #title) / 2)
     print(string.rep(" ", padding) .. title)
     print(string.rep("=", w))
@@ -100,118 +91,110 @@ local function readNumber(prompt, min, max)
     end
 end
 
--- === MENUS ===
+-- === DECLARATIONS ANTICIPEES ===
+local menuMain
+local menuSearch
+local menuFavorites
+local menuCategories
+local menuStats
+local menuConfig
+local menuConfigChests
+local menuConfigCategories
+local menuConfigFavorites
+local displayItemList
+local menuItemAction
+local actionRetrieveItem
+local actionAddFavorite
+local actionRemoveFavorite
+local actionEmptyInput
 
--- Menu principal
-local function menuMain()
-    printHeader("STOCKAGE")
+-- === ACTIONS ===
+
+actionRetrieveItem = function(item)
+    printHeader("COMMANDER")
     
-    printOption(1, "Rechercher un item")
-    printOption(2, "Favoris")
-    printOption(3, "Par categorie")
-    printOption(4, "Vider coffre entree")
-    printOption(5, "Statistiques")
-    printOption(6, "Configuration")
-    printOption(0, "Quitter")
-    
+    print("Item: " .. item.displayName)
+    print("En stock: " .. item.count)
     print("")
-    local choice = readInput("> ")
     
-    if choice == "1" then
-        menuSearch()
-    elseif choice == "2" then
-        menuFavorites()
-    elseif choice == "3" then
-        menuCategories()
-    elseif choice == "4" then
-        actionEmptyInput()
-    elseif choice == "5" then
-        menuStats()
-    elseif choice == "6" then
-        menuConfig()
-    elseif choice == "0" then
-        running = false
+    if item.count == 0 then
+        print("Stock vide!")
+        waitKey()
+        return
     end
-end
-
--- Menu recherche
-local function menuSearch()
-    printHeader("RECHERCHE")
     
-    local query = readInput("Recherche: ")
-    
-    if query == "" then return end
+    local max = math.min(item.count, 64)
+    local count = readNumber("Quantite (1-" .. max .. "): ", 1, max)
     
     print("")
-    print("Recherche en cours...")
+    print("Envoi de la commande...")
     
     local response, err = sendRequest({
-        type = "search",
-        query = query
+        type = "retrieve_item",
+        itemName = item.name,
+        count = count
     })
     
-    if not response or not response.success then
-        print("Erreur: " .. (err or response.error or "?"))
-        waitKey()
-        return
+    if response and response.success then
+        print("OK! " .. response.data .. " items envoyes")
+        print("Recuperez dans le coffre de sortie")
+    else
+        print("Erreur: " .. (err or (response and response.error) or "?"))
     end
     
-    local results = response.data
-    
-    if #results == 0 then
-        print("Aucun resultat")
-        waitKey()
-        return
-    end
-    
-    -- Affiche les résultats
-    displayItemList(results, "RESULTATS")
+    waitKey()
 end
 
--- Affiche une liste d'items avec sélection
-local function displayItemList(items, title)
-    local page = 1
-    local itemsPerPage = 8
-    local totalPages = math.ceil(#items / itemsPerPage)
+actionAddFavorite = function(itemName)
+    local response = sendRequest({
+        type = "add_favorite",
+        itemName = itemName
+    })
     
-    while true do
-        printHeader(title .. " (" .. #items .. ")")
-        
-        local startIdx = (page - 1) * itemsPerPage + 1
-        local endIdx = math.min(startIdx + itemsPerPage - 1, #items)
-        
-        for i = startIdx, endIdx do
-            local item = items[i]
-            local name = item.displayName or item.name
-            if #name > 18 then
-                name = name:sub(1, 16) .. ".."
-            end
-            print("[" .. (i - startIdx + 1) .. "] " .. name .. " x" .. item.count)
-        end
-        
-        print("")
-        print("Page " .. page .. "/" .. totalPages)
-        print("[N]Suivant [P]Prec [#]Commander [Q]Retour")
-        
-        local choice = readInput("> "):lower()
-        
-        if choice == "n" and page < totalPages then
-            page = page + 1
-        elseif choice == "p" and page > 1 then
-            page = page - 1
-        elseif choice == "q" then
-            return
-        elseif tonumber(choice) then
-            local idx = startIdx + tonumber(choice) - 1
-            if idx <= #items then
-                menuItemAction(items[idx])
-            end
-        end
+    if response and response.success then
+        print("Ajoute aux favoris!")
+    else
+        print("Erreur: " .. (response and response.error or "?"))
     end
+    waitKey()
 end
 
--- Menu action sur un item
-local function menuItemAction(item)
+actionRemoveFavorite = function(itemName)
+    local response = sendRequest({
+        type = "remove_favorite",
+        itemName = itemName
+    })
+    
+    if response and response.success then
+        print("Retire des favoris!")
+    else
+        print("Erreur: " .. (response and response.error or "?"))
+    end
+    waitKey()
+end
+
+actionEmptyInput = function()
+    printHeader("VIDER ENTREE")
+    
+    print("Tri du coffre d'entree...")
+    
+    local response, err = sendRequest({type = "empty_input"})
+    
+    if response then
+        print(response.data .. " items tries")
+        if response.error then
+            print("Note: " .. response.error)
+        end
+    else
+        print("Erreur: " .. (err or "?"))
+    end
+    
+    waitKey()
+end
+
+-- === MENU ACTION ITEM ===
+
+menuItemAction = function(item)
     printHeader(item.displayName)
     
     print("En stock: " .. item.count)
@@ -234,8 +217,87 @@ local function menuItemAction(item)
     end
 end
 
--- Menu favoris
-local function menuFavorites()
+-- === AFFICHAGE LISTE ITEMS ===
+
+displayItemList = function(items, title)
+    local page = 1
+    local itemsPerPage = 8
+    local totalPages = math.ceil(#items / itemsPerPage)
+    if totalPages == 0 then totalPages = 1 end
+    
+    while true do
+        printHeader(title .. " (" .. #items .. ")")
+        
+        local startIdx = (page - 1) * itemsPerPage + 1
+        local endIdx = math.min(startIdx + itemsPerPage - 1, #items)
+        
+        for i = startIdx, endIdx do
+            local item = items[i]
+            local name = item.displayName or item.name
+            if #name > 18 then
+                name = name:sub(1, 16) .. ".."
+            end
+            print("[" .. (i - startIdx + 1) .. "] " .. name .. " x" .. item.count)
+        end
+        
+        print("")
+        print("Page " .. page .. "/" .. totalPages)
+        print("[N]Suivant [P]Prec [#]Choisir [Q]Retour")
+        
+        local choice = readInput("> "):lower()
+        
+        if choice == "n" and page < totalPages then
+            page = page + 1
+        elseif choice == "p" and page > 1 then
+            page = page - 1
+        elseif choice == "q" then
+            return
+        elseif tonumber(choice) then
+            local idx = startIdx + tonumber(choice) - 1
+            if idx >= 1 and idx <= #items then
+                menuItemAction(items[idx])
+            end
+        end
+    end
+end
+
+-- === MENU RECHERCHE ===
+
+menuSearch = function()
+    printHeader("RECHERCHE")
+    
+    local query = readInput("Recherche: ")
+    
+    if query == "" then return end
+    
+    print("")
+    print("Recherche en cours...")
+    
+    local response, err = sendRequest({
+        type = "search",
+        query = query
+    })
+    
+    if not response or not response.success then
+        print("Erreur: " .. (err or (response and response.error) or "?"))
+        waitKey()
+        return
+    end
+    
+    local results = response.data
+    
+    if #results == 0 then
+        print("Aucun resultat")
+        waitKey()
+        return
+    end
+    
+    displayItemList(results, "RESULTATS")
+end
+
+-- === MENU FAVORIS ===
+
+menuFavorites = function()
     printHeader("FAVORIS")
     
     print("Chargement...")
@@ -280,18 +342,21 @@ local function menuFavorites()
             if favorites[idx] and favorites[idx].inStock then
                 actionRetrieveItem(favorites[idx])
                 
-                -- Rafraîchit les favoris
                 response = sendRequest({type = "get_favorites"})
                 if response and response.success then
                     favorites = response.data
                 end
+            elseif favorites[idx] then
+                print("Stock vide!")
+                waitKey()
             end
         end
     end
 end
 
--- Menu catégories
-local function menuCategories()
+-- === MENU CATEGORIES ===
+
+menuCategories = function()
     printHeader("CATEGORIES")
     
     print("Chargement...")
@@ -306,10 +371,9 @@ local function menuCategories()
     
     local byCategory = response.data
     
-    -- Liste les catégories non vides
     local categories = {}
     for name, data in pairs(byCategory) do
-        if #data.items > 0 then
+        if data.items and #data.items > 0 then
             table.insert(categories, {name = name, count = #data.items, items = data.items})
         end
     end
@@ -347,8 +411,9 @@ local function menuCategories()
     end
 end
 
--- Menu statistiques
-local function menuStats()
+-- === MENU STATISTIQUES ===
+
+menuStats = function()
     printHeader("STATISTIQUES")
     
     print("Chargement...")
@@ -377,7 +442,6 @@ local function menuStats()
     local percent = math.floor((stats.usedSlots / math.max(stats.totalSlots, 1)) * 100)
     print("Utilisation: " .. percent .. "%")
     
-    -- Alertes
     local alertResponse = sendRequest({type = "get_alerts"})
     if alertResponse and alertResponse.success and #alertResponse.data > 0 then
         print("")
@@ -390,33 +454,9 @@ local function menuStats()
     waitKey()
 end
 
--- Menu configuration
-local function menuConfig()
-    while true do
-        printHeader("CONFIGURATION")
-        
-        printOption(1, "Gerer les coffres")
-        printOption(2, "Gerer les categories")
-        printOption(3, "Gerer les favoris")
-        printOption(0, "Retour")
-        
-        print("")
-        local choice = readInput("> ")
-        
-        if choice == "1" then
-            menuConfigChests()
-        elseif choice == "2" then
-            menuConfigCategories()
-        elseif choice == "3" then
-            menuConfigFavorites()
-        elseif choice == "0" then
-            return
-        end
-    end
-end
+-- === MENU CONFIG COFFRES ===
 
--- Configuration des coffres
-local function menuConfigChests()
+menuConfigChests = function()
     printHeader("COFFRES")
     
     print("Chargement...")
@@ -436,7 +476,11 @@ local function menuConfigChests()
     
     for i, chest in ipairs(chests) do
         local status = chest.isUsed and "[ACTIF]" or "[LIBRE]"
-        print(i .. ". " .. chest.name:sub(1, 20))
+        local name = chest.name
+        if #name > 20 then
+            name = ".." .. name:sub(-18)
+        end
+        print(i .. ". " .. name)
         print("   " .. status .. " " .. chest.size .. " slots")
     end
     
@@ -477,24 +521,44 @@ local function menuConfigChests()
         waitKey()
         
     elseif choice == "s" then
-        local idx = readNumber("Numero a supprimer: ", 1, #chests)
+        local activeChests = {}
+        for _, c in ipairs(chests) do
+            if c.isUsed then
+                table.insert(activeChests, c)
+            end
+        end
+        
+        if #activeChests == 0 then
+            print("Aucun coffre actif")
+            waitKey()
+            return
+        end
+        
+        print("")
+        print("Coffres actifs:")
+        for i, c in ipairs(activeChests) do
+            print(i .. ". " .. c.name)
+        end
+        
+        local idx = readNumber("Numero a supprimer: ", 1, #activeChests)
         
         local removeResponse = sendRequest({
             type = "remove_chest",
-            chestName = chests[idx].name
+            chestName = activeChests[idx].name
         })
         
         if removeResponse and removeResponse.success then
             print("Coffre supprime!")
         else
-            print("Erreur: " .. (removeResponse.error or "?"))
+            print("Erreur: " .. (removeResponse and removeResponse.error or "?"))
         end
         waitKey()
     end
 end
 
--- Configuration des catégories
-local function menuConfigCategories()
+-- === MENU CONFIG CATEGORIES ===
+
+menuConfigCategories = function()
     printHeader("CATEGORIES")
     
     local response = sendRequest({type = "get_categories"})
@@ -509,8 +573,12 @@ local function menuConfigCategories()
     
     for i, cat in ipairs(categories) do
         print(i .. ". " .. cat.name)
-        if #cat.patterns > 0 then
-            print("   Patterns: " .. table.concat(cat.patterns, ", "):sub(1, 25))
+        if cat.patterns and #cat.patterns > 0 then
+            local patternsStr = table.concat(cat.patterns, ", ")
+            if #patternsStr > 25 then
+                patternsStr = patternsStr:sub(1, 22) .. "..."
+            end
+            print("   " .. patternsStr)
         end
     end
     
@@ -547,8 +615,9 @@ local function menuConfigCategories()
     end
 end
 
--- Configuration des favoris
-local function menuConfigFavorites()
+-- === MENU CONFIG FAVORIS ===
+
+menuConfigFavorites = function()
     printHeader("GERER FAVORIS")
     
     local response = sendRequest({type = "get_favorites"})
@@ -558,6 +627,10 @@ local function menuConfigFavorites()
         for i, fav in ipairs(response.data) do
             print(i .. ". " .. fav.displayName)
         end
+        
+        if #response.data == 0 then
+            print("(aucun)")
+        end
     end
     
     print("")
@@ -566,7 +639,7 @@ local function menuConfigFavorites()
     
     local choice = readInput("> "):lower()
     
-    if choice == "s" then
+    if choice == "s" and response and #response.data > 0 then
         local idx = readNumber("Numero: ", 1, #response.data)
         
         sendRequest({
@@ -578,86 +651,63 @@ local function menuConfigFavorites()
     end
 end
 
--- === ACTIONS ===
+-- === MENU CONFIGURATION ===
 
--- Commander un item
-local function actionRetrieveItem(item)
-    printHeader("COMMANDER")
-    
-    print("Item: " .. item.displayName)
-    print("En stock: " .. item.count)
-    print("")
-    
-    local max = math.min(item.count, 64)
-    local count = readNumber("Quantite (1-" .. max .. "): ", 1, max)
-    
-    print("")
-    print("Envoi de la commande...")
-    
-    local response, err = sendRequest({
-        type = "retrieve_item",
-        itemName = item.name,
-        count = count
-    })
-    
-    if response and response.success then
-        print("OK! " .. response.data .. " items envoyes")
-        print("Recuperez dans le coffre de sortie")
-    else
-        print("Erreur: " .. (err or response.error or "?"))
-    end
-    
-    waitKey()
-end
-
--- Vider le coffre d'entrée
-local function actionEmptyInput()
-    printHeader("VIDER ENTREE")
-    
-    print("Tri du coffre d'entree...")
-    
-    local response, err = sendRequest({type = "empty_input"})
-    
-    if response then
-        print(response.data .. " items tries")
-        if response.error then
-            print("Note: " .. response.error)
+menuConfig = function()
+    while true do
+        printHeader("CONFIGURATION")
+        
+        printOption(1, "Gerer les coffres")
+        printOption(2, "Gerer les categories")
+        printOption(3, "Gerer les favoris")
+        printOption(0, "Retour")
+        
+        print("")
+        local choice = readInput("> ")
+        
+        if choice == "1" then
+            menuConfigChests()
+        elseif choice == "2" then
+            menuConfigCategories()
+        elseif choice == "3" then
+            menuConfigFavorites()
+        elseif choice == "0" then
+            return
         end
-    else
-        print("Erreur: " .. (err or "?"))
     end
-    
-    waitKey()
 end
 
--- Ajouter aux favoris
-local function actionAddFavorite(itemName)
-    local response = sendRequest({
-        type = "add_favorite",
-        itemName = itemName
-    })
-    
-    if response and response.success then
-        print("Ajoute aux favoris!")
-    else
-        print("Erreur: " .. (response and response.error or "?"))
-    end
-    waitKey()
-end
+-- === MENU PRINCIPAL ===
 
--- Retirer des favoris
-local function actionRemoveFavorite(itemName)
-    local response = sendRequest({
-        type = "remove_favorite",
-        itemName = itemName
-    })
+menuMain = function()
+    printHeader("STOCKAGE")
     
-    if response and response.success then
-        print("Retire des favoris!")
-    else
-        print("Erreur: " .. (response and response.error or "?"))
+    printOption(1, "Rechercher un item")
+    printOption(2, "Favoris")
+    printOption(3, "Par categorie")
+    printOption(4, "Vider coffre entree")
+    printOption(5, "Statistiques")
+    printOption(6, "Configuration")
+    printOption(0, "Quitter")
+    
+    print("")
+    local choice = readInput("> ")
+    
+    if choice == "1" then
+        menuSearch()
+    elseif choice == "2" then
+        menuFavorites()
+    elseif choice == "3" then
+        menuCategories()
+    elseif choice == "4" then
+        actionEmptyInput()
+    elseif choice == "5" then
+        menuStats()
+    elseif choice == "6" then
+        menuConfig()
+    elseif choice == "0" then
+        running = false
     end
-    waitKey()
 end
 
 -- === PROGRAMME PRINCIPAL ===
@@ -692,13 +742,4 @@ local function main()
     print("Deconnecte.")
 end
 
--- Déclarations anticipées pour éviter les erreurs
-displayItemList = displayItemList
-menuItemAction = menuItemAction
-actionRetrieveItem = actionRetrieveItem
-actionAddFavorite = actionAddFavorite
-actionRemoveFavorite = actionRemoveFavorite
-actionEmptyInput = actionEmptyInput
-
--- Lance le programme
 main()
