@@ -1,6 +1,6 @@
 -- ============================================
 -- UI.lua - Interface Moniteur Esthetique
--- Schematic Builder v1.1
+-- Schematic Builder v1.2
 -- ============================================
 
 local ui = {}
@@ -39,14 +39,8 @@ function ui.init()
         return false, "Moniteur non trouve"
     end
     
-    -- Auto-scale selon taille
     mon.setTextScale(0.5)
     W, H = mon.getSize()
-    
-    if W < 50 then
-        mon.setTextScale(0.5)
-        W, H = mon.getSize()
-    end
     
     return true
 end
@@ -96,7 +90,6 @@ end
 function ui.box(x, y, w, h, title)
     ui.setColor(C.border, C.bg)
     
-    -- Coins et bordures
     ui.write(x, y, "+" .. string.rep("-", w - 2) .. "+")
     for i = 1, h - 2 do
         ui.write(x, y + i, "|")
@@ -104,7 +97,6 @@ function ui.box(x, y, w, h, title)
     end
     ui.write(x, y + h - 1, "+" .. string.rep("-", w - 2) .. "+")
     
-    -- Titre
     if title then
         ui.setColor(C.accent, C.bg)
         ui.write(x + 2, y, "[ " .. title .. " ]")
@@ -435,7 +427,7 @@ function ui.drawMaterials(materials, slots, page)
 end
 
 -- ============================================
--- CLAVIER NUMERIQUE
+-- CLAVIER NUMERIQUE COMPACT
 -- ============================================
 
 function ui.numberInput(title, current)
@@ -445,31 +437,35 @@ function ui.numberInput(title, current)
         ui.clear()
         ui.header(title:sub(1, W - 2))
         
-        -- Valeur
-        ui.box(2, 3, W - 2, 3, "VALEUR")
+        -- Valeur actuelle
         ui.setColor(C.success, C.bg)
-        ui.center(4, "[ " .. value .. " ]")
+        ui.center(3, "Valeur: " .. value)
         
-        -- Clavier
-        local keys = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "-", "0", "C"}
-        local keyW = math.floor((W - 6) / 3)
-        local startY = 7
+        -- Clavier compact - 4 colonnes x 4 lignes
+        local keys = {
+            {"1", "2", "3", "-"},
+            {"4", "5", "6", "0"},
+            {"7", "8", "9", "C"},
+        }
         
-        for i, key in ipairs(keys) do
-            local col = (i - 1) % 3
-            local row = math.floor((i - 1) / 3)
-            local x = 3 + col * (keyW + 1)
-            local y = startY + row * 2
-            
-            if y < H - 2 then
+        local keyW = math.floor((W - 8) / 4)
+        local startX = math.floor((W - (keyW * 4 + 3)) / 2) + 1
+        local startY = 5
+        
+        for row, rowKeys in ipairs(keys) do
+            for col, key in ipairs(rowKeys) do
+                local x = startX + (col - 1) * (keyW + 1)
+                local y = startY + (row - 1) * 2
                 ui.button(x, y, keyW, key, false, "k" .. key)
             end
         end
         
-        -- OK / Annuler
-        local btnW = math.floor(W / 2) - 2
-        ui.button(2, H - 1, btnW, "Annuler", false, "cancel")
-        ui.button(W - btnW, H - 1, btnW, "OK", true, "ok")
+        -- Boutons OK / Annuler
+        local btnY = startY + 6
+        local btnW = math.floor((W - 6) / 2)
+        
+        ui.button(2, btnY, btnW, "Annuler", false, "cancel")
+        ui.button(W - btnW - 1, btnY, btnW, "OK", true, "ok")
         
         -- Attente clic
         local event, side, cx, cy = os.pullEvent("monitor_touch")
@@ -482,8 +478,14 @@ function ui.numberInput(title, current)
                 return nil
             elseif clicked == "kC" then
                 value = ""
-            elseif clicked == "k-" and #value == 0 then
-                value = "-"
+            elseif clicked == "k-" then
+                if #value == 0 then
+                    value = "-"
+                end
+            elseif clicked == "k0" then
+                if #value > 0 or value == "-" then
+                    value = value .. "0"
+                end
             elseif clicked:match("^k%d$") then
                 value = value .. clicked:sub(2)
             end
