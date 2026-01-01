@@ -127,6 +127,10 @@ local function refresh()
         ui.drawSchematics(listSchematics(), state.selectedFile)
     elseif state.screen == "materials" then
         ui.drawMaterials(state.materials, config.slotMapping, state.materialPage)
+    elseif state.screen == "turtle" then
+        ui.drawTurtle(state)
+    elseif state.screen == "direction" then
+        ui.drawDirectionChoice(state.tempDirection or 0)
     end
 end
 
@@ -245,8 +249,21 @@ local function handleSchematics(clicked)
             local files = listSchematics()
             local name = files[state.selectedFile]
             if name then
-                send("load_schematic", {path = config.schematicsFolder .. "/" .. name})
-                state.schematicName = name
+                local path = config.schematicsFolder .. "/" .. name
+                -- Lire le fichier et envoyer le contenu à la turtle
+                local f = fs.open(path, "r")
+                if f then
+                    local content = f.readAll()
+                    f.close()
+                    send("load_schematic_data", {
+                        filename = name,
+                        content = content
+                    })
+                    state.schematicName = name
+                    state.status = "chargement..."
+                else
+                    state.status = "err:lecture"
+                end
             end
         end
         state.screen = "main"
@@ -281,6 +298,59 @@ local function handleMaterials(clicked)
     refresh()
 end
 
+local function handleTurtle(clicked)
+    if clicked == "back" then
+        state.screen = "main"
+        
+    elseif clicked == "calibrate" then
+        send("calibrate", {})
+        state.status = "calibration..."
+        
+    elseif clicked == "setdir" then
+        state.screen = "direction"
+        state.tempDirection = state.facing or 0
+        
+    elseif clicked == "setpos" then
+        -- Configurer X
+        local x = ui.numberInput("Position X", state.x or 0)
+        if x then
+            local y = ui.numberInput("Position Y", state.y or 0)
+            if y then
+                local z = ui.numberInput("Position Z", state.z or 0)
+                if z then
+                    send("set_position", {x = x, y = y, z = z, facing = state.facing or 0})
+                    state.x = x
+                    state.y = y
+                    state.z = z
+                    state.status = "position OK"
+                end
+            end
+        end
+    end
+    refresh()
+end
+
+local function handleDirection(clicked)
+    if clicked == "cancel" then
+        state.screen = "turtle"
+        
+    elseif clicked == "ok" then
+        send("set_position", {
+            x = state.x or 0,
+            y = state.y or 0,
+            z = state.z or 0,
+            facing = state.tempDirection or 0
+        })
+        state.facing = state.tempDirection
+        state.status = "direction OK"
+        state.screen = "turtle"
+        
+    elseif clicked and clicked:match("^dir%d$") then
+        state.tempDirection = tonumber(clicked:sub(4)) or 0
+    end
+    refresh()
+end
+
 local function handleClick(x, y)
     local clicked = ui.checkClick(x, y)
     if not clicked then return end
@@ -290,6 +360,8 @@ local function handleClick(x, y)
     elseif state.screen == "position" then handlePosition(clicked)
     elseif state.screen == "schematics" then handleSchematics(clicked)
     elseif state.screen == "materials" then handleMaterials(clicked)
+    elseif state.screen == "turtle" then handleTurtle(clicked)
+    elseif state.screen == "direction" then handleDirection(clicked)
     end
 end
 

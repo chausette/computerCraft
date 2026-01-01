@@ -370,7 +370,47 @@ local function handleMessage(message)
     if msgType == "ping" then
         sendStatus()
         
+    elseif msgType == "load_schematic_data" then
+        -- Reçoit le contenu du fichier depuis le serveur
+        local filename = data.filename or "unknown"
+        local content = data.content
+        
+        if not content then
+            sendToServer("error", {message = "Pas de contenu recu"})
+            return
+        end
+        
+        -- Sauvegarder temporairement
+        local tempPath = "temp_schematic.json"
+        local file = fs.open(tempPath, "w")
+        if file then
+            file.write(content)
+            file.close()
+            
+            -- Parser le fichier
+            local sch, err = nbt.loadSchematic(tempPath)
+            fs.delete(tempPath)
+            
+            if sch then
+                state.schematic = sch
+                state.totalBlocks = sch.width * sch.height * sch.length
+                local materials = nbt.getMaterialList(sch)
+                sendToServer("schematic_loaded", {
+                    width = sch.width,
+                    height = sch.height,
+                    length = sch.length,
+                    totalBlocks = state.totalBlocks,
+                    materials = materials
+                })
+            else
+                sendToServer("error", {message = err or "Erreur parsing"})
+            end
+        else
+            sendToServer("error", {message = "Erreur ecriture temp"})
+        end
+        
     elseif msgType == "load_schematic" then
+        -- Ancienne methode (fichier local)
         local sch, err = nbt.loadSchematic(data.path)
         if sch then
             state.schematic = sch

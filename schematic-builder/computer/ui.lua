@@ -199,6 +199,9 @@ function ui.drawMain(state)
     local pauseTxt = state.paused and "REPRENDRE" or "6. Pause"
     ui.button(midX + 1, y, btnW, pauseTxt, state.building, "pause")
     
+    y = y + 2
+    ui.button(2, y, btnW, "7. Turtle", false, "turtle")
+    
     -- Separateur
     y = y + 2
     ui.setColor(C.border, C.bg)
@@ -424,6 +427,80 @@ function ui.drawMaterials(materials, slots, page)
     end
     
     ui.button(W - btnW - 1, H - 1, btnW, "Sauver", true, "save")
+end
+
+-- ============================================
+-- ECRAN CONFIGURATION TURTLE
+-- ============================================
+
+function ui.drawTurtle(state)
+    ui.clear()
+    ui.header("CONFIGURATION TURTLE")
+    
+    local y = 3
+    local midX = math.floor(W / 2)
+    
+    -- Position actuelle
+    ui.setColor(C.accent, C.bg)
+    ui.write(2, y, "Position actuelle:")
+    y = y + 1
+    ui.setColor(C.text, C.bg)
+    ui.write(2, y, string.format("X:%d Y:%d Z:%d", state.x or 0, state.y or 0, state.z or 0))
+    
+    y = y + 2
+    ui.setColor(C.accent, C.bg)
+    ui.write(2, y, "Direction:")
+    ui.setColor(C.text, C.bg)
+    local dirs = {"Nord", "Est", "Sud", "Ouest"}
+    ui.write(14, y, dirs[(state.facing or 0) + 1] or "?")
+    
+    y = y + 2
+    ui.setColor(C.accent, C.bg)
+    ui.write(2, y, "Fuel:")
+    ui.setColor(state.fuel and state.fuel < 100 and C.error or C.success, C.bg)
+    ui.write(8, y, tostring(state.fuel or 0))
+    
+    -- Boutons de configuration
+    y = y + 3
+    local btnW = math.floor(W / 2) - 3
+    
+    ui.button(2, y, btnW, "Calibrer GPS", true, "calibrate")
+    ui.button(midX + 1, y, btnW, "Def. Direction", false, "setdir")
+    
+    y = y + 2
+    ui.button(2, y, btnW, "Def. Position", false, "setpos")
+    
+    -- Boutons bas
+    ui.button(2, H - 1, btnW, "< Retour", false, "back")
+end
+
+-- ============================================
+-- ECRAN CHOIX DIRECTION
+-- ============================================
+
+function ui.drawDirectionChoice(currentDir)
+    ui.clear()
+    ui.header("DIRECTION TURTLE")
+    
+    local y = 4
+    ui.setColor(C.text, C.bg)
+    ui.center(y, "Dans quelle direction")
+    ui.center(y + 1, "regarde la turtle?")
+    
+    y = y + 4
+    local dirs = {"NORD", "EST", "SUD", "OUEST"}
+    local dirW = math.floor((W - 4) / 4)
+    
+    for i, dir in ipairs(dirs) do
+        local active = (currentDir == i - 1)
+        local x = 2 + (i - 1) * dirW
+        ui.button(x, y, dirW - 1, dir, active, "dir" .. (i - 1))
+    end
+    
+    -- Boutons bas
+    local btnW = math.floor(W / 2) - 2
+    ui.button(2, H - 1, btnW, "Annuler", false, "cancel")
+    ui.button(W - btnW, H - 1, btnW, "OK", true, "ok")
 end
 
 -- ============================================

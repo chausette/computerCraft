@@ -167,6 +167,22 @@ Plus simple à créer et modifier :
 
 Structure : `blocks[Y][Z][X]` (couche → rangée → colonne)
 
+### Convertir depuis Litematica (.litematic)
+
+Des convertisseurs sont fournis dans le dossier `tools/`:
+
+**Python (recommandé):**
+```bash
+python litematic2json.py ma_construction.litematic
+```
+
+**PHP:**
+```bash
+php litematic2json.php ma_construction.litematic
+```
+
+Cela génère un fichier `.json` que tu peux uploader dans le dossier `schematics/`.
+
 ### Format .schematic (MCEdit)
 
 ⚠️ **Important** : Les fichiers .schematic sont compressés en GZIP.

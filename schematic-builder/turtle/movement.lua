@@ -48,52 +48,77 @@ function movement.calibrate()
         return false, "GPS non disponible"
     end
     
-    local startX, startZ = movement.x, movement.z
+    local startX, startY, startZ = movement.x, movement.y, movement.z
     
-    -- Essaie d'avancer
-    if turtle.forward() then
-        if movement.locate() then
-            local dx = movement.x - startX
-            local dz = movement.z - startZ
-            
-            if dz == -1 then movement.facing = 0      -- Nord
-            elseif dx == 1 then movement.facing = 1   -- Est
-            elseif dz == 1 then movement.facing = 2   -- Sud
-            elseif dx == -1 then movement.facing = 3  -- Ouest
-            end
-            
-            -- Retourne a la position initiale
-            turtle.back()
-            movement.x = startX
-            movement.z = startZ
-            return true
-        end
-    end
-    
-    -- Si impossible d'avancer, essaie de tourner et reessayer
-    for i = 1, 4 do
-        turtle.turnRight()
+    -- Essaie d'avancer dans chaque direction
+    for attempt = 1, 4 do
+        -- Essaie d'avancer
         if turtle.forward() then
+            sleep(0.2) -- Petit delai pour le GPS
             if movement.locate() then
                 local dx = movement.x - startX
                 local dz = movement.z - startZ
                 
-                if dz == -1 then movement.facing = 0
-                elseif dx == 1 then movement.facing = 1
-                elseif dz == 1 then movement.facing = 2
-                elseif dx == -1 then movement.facing = 3
+                if dz == -1 then movement.facing = 0      -- Nord
+                elseif dx == 1 then movement.facing = 1   -- Est
+                elseif dz == 1 then movement.facing = 2   -- Sud
+                elseif dx == -1 then movement.facing = 3  -- Ouest
                 end
                 
+                -- Retourne a la position initiale
                 turtle.back()
                 movement.x = startX
+                movement.y = startY
                 movement.z = startZ
                 return true
+            else
+                -- GPS perdu, retourne
+                turtle.back()
+                movement.x = startX
+                movement.y = startY
+                movement.z = startZ
             end
-            turtle.back()
+        end
+        
+        -- Tourne et essaie une autre direction
+        turtle.turnRight()
+    end
+    
+    -- Essaie de monter/descendre si bloque horizontalement
+    if turtle.up() then
+        sleep(0.2)
+        if movement.locate() then
+            turtle.down()
+            -- On a pu bouger verticalement, essaie encore horizontalement
+            movement.y = startY
+            for attempt = 1, 4 do
+                if turtle.forward() then
+                    sleep(0.2)
+                    if movement.locate() then
+                        local dx = movement.x - startX
+                        local dz = movement.z - startZ
+                        
+                        if dz == -1 then movement.facing = 0
+                        elseif dx == 1 then movement.facing = 1
+                        elseif dz == 1 then movement.facing = 2
+                        elseif dx == -1 then movement.facing = 3
+                        end
+                        
+                        turtle.back()
+                        movement.x = startX
+                        movement.z = startZ
+                        return true
+                    end
+                    turtle.back()
+                end
+                turtle.turnRight()
+            end
+        else
+            turtle.down()
         end
     end
     
-    return false, "Impossible de calibrer la direction"
+    return false, "Impossible de calibrer - turtle bloquee?"
 end
 
 -- ============================================
