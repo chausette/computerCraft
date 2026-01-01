@@ -5,7 +5,7 @@
 -- Installation:
 -- pastebin run <CODE>
 -- ou
--- wget run https://raw.githubusercontent.com/VOTRE_USER/VOTRE_REPO/main/installer.lua
+-- wget run https://raw.githubusercontent.com/chausette/computerCraft/master/schematic-builder/installer.lua
 -- ============================================
 
 -- ===========================================
@@ -13,14 +13,15 @@
 -- ===========================================
 
 local GITHUB_USER = "chausette"
-local GITHUB_REPO = "schematic-builder"
+local GITHUB_REPO = "computerCraft"
 local GITHUB_BRANCH = "master"
+local GITHUB_DIRECTORY = "schematic-builder"
 
 -- ===========================================
 -- NE PAS MODIFIER EN DESSOUS
 -- ===========================================
 
-local BASE_URL = "https://raw.githubusercontent.com/" .. GITHUB_USER .. "/" .. GITHUB_REPO .. "/" .. GITHUB_BRANCH .. "/"
+local BASE_URL = "https://raw.githubusercontent.com/" .. GITHUB_USER .. "/" .. GITHUB_REPO .. "/" .. GITHUB_BRANCH .. "/" .. GITHUB_DIRECTORY .."/"
 
 -- Couleurs
 local function setColor(color)
