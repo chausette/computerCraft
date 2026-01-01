@@ -358,8 +358,16 @@ function nbt.parseJSON(filepath)
         length = data.length or 0,
         blocks = {},
         data = {},
-        palette = data.palette or {}
+        palette = {}
     }
+    
+    -- Convertir la palette (les cles peuvent etre des strings)
+    if data.palette then
+        for k, v in pairs(data.palette) do
+            local idx = tonumber(k) or k
+            parsed.palette[idx] = v
+        end
+    end
     
     -- Convertir le tableau 3D en tableau 1D
     if data.blocks then
