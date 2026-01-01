@@ -7,7 +7,7 @@ Système complet pour construire des schematics avec une Turtle, contrôlée via
 Sur **n'importe quelle machine** (Turtle, Computer, GPS Host), exécutez :
 
 ```
-wget run https://raw.githubusercontent.com/VOTRE_USER/schematic-builder/main/installer.lua
+wget run https://raw.githubusercontent.com/chausette/schematic-builder/main/installer.lua
 ```
 
 L'installateur détecte automatiquement le type de machine et installe les bons fichiers!
@@ -34,36 +34,12 @@ schematic-builder/
 
 ---
 
-## 📦 Configuration GitHub
-
-### 1. Créez votre repository
-
-1. Allez sur [github.com](https://github.com) et créez un nouveau repository
-2. Nommez-le `schematic-builder` (ou ce que vous voulez)
-3. Rendez-le **Public** (requis pour que CC puisse télécharger)
-
-### 2. Uploadez les fichiers
-
-Uploadez tous les fichiers en respectant la structure ci-dessus.
-
-### 3. Modifiez l'installer
-
-Dans `installer.lua`, changez ces lignes :
-
-```lua
-local GITHUB_USER = "VOTRE_USERNAME"    -- Votre nom d'utilisateur GitHub
-local GITHUB_REPO = "schematic-builder"  -- Nom de votre repo
-local GITHUB_BRANCH = "main"             -- Branche (main ou master)
-```
-
----
-
 ## 🔧 Installation Manuelle
 
 ### GPS Hosts (4 machines en hauteur)
 
 ```
-wget https://raw.githubusercontent.com/USER/REPO/main/installer.lua installer
+wget https://raw.githubusercontent.com/chausette/schematic-builder/main/installer.lua installer
 installer
 -- Choisir "GPS Host"
 -- Entrer les coordonnées X, Y, Z
@@ -80,14 +56,14 @@ installer
 ### Serveur (Advanced Computer + Moniteur 3x2)
 
 ```
-wget run https://raw.githubusercontent.com/USER/REPO/main/installer.lua
+wget run https://raw.githubusercontent.com/chausette/schematic-builder/main/installer.lua
 -- L'installer détecte automatiquement le moniteur
 ```
 
 ### Turtle (Mining Turtle + Wireless Modem)
 
 ```
-wget run https://raw.githubusercontent.com/USER/REPO/main/installer.lua
+wget run https://raw.githubusercontent.com/chausette/schematic-builder/main/installer.lua
 -- L'installer détecte automatiquement la turtle
 ```
 
