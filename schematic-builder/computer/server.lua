@@ -10,8 +10,8 @@ local ui = require("ui")
 -- ============================================
 
 local config = {
-    serverChannel = 100,
-    turtleChannel = 101,
+    serverChannel = 300,
+    turtleChannel = 301,
     
     fuelChest = nil,
     materialChest = nil,
