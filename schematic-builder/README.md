@@ -1,153 +1,226 @@
 # ComputerCraft Schematic Builder
 
-## Architecture du système
+Système complet pour construire des schematics avec une Turtle, contrôlée via un Advanced Computer avec moniteur tactile.
+
+## 🚀 Installation Rapide (Une seule commande!)
+
+Sur **n'importe quelle machine** (Turtle, Computer, GPS Host), exécutez :
 
 ```
-[GPS Host x4]     (en hauteur, modems wireless)
-      |
-      v
-[Turtle Builder] <--wireless--> [Advanced Computer] --- [Moniteur 3x2]
-      |                                |
-      v                                v
-[Coffre Fuel]                    [Schematics]
-[Coffre Matériaux]
+wget run https://raw.githubusercontent.com/VOTRE_USER/schematic-builder/main/installer.lua
 ```
 
-## Installation
+L'installateur détecte automatiquement le type de machine et installe les bons fichiers!
 
-### Étape 1 : Réseau GPS (4 Advanced Computers)
+---
 
-Place 4 Advanced Computers en hauteur (y=200+) avec des Wireless Modems.
-Espacement minimum de 6 blocs entre chaque.
-
-Sur **chaque** GPS Host, crée le fichier `startup.lua` :
+## 📁 Structure du Repository GitHub
 
 ```
-edit startup.lua
+schematic-builder/
+├── installer.lua          # Installateur universel
+├── README.md
+├── turtle/
+│   ├── nbt.lua            # Parser NBT/Schematic
+│   ├── movement.lua       # Gestion GPS et déplacements
+│   ├── builder.lua        # Programme principal turtle
+│   └── gps_host.lua       # Programme GPS host
+└── computer/
+    ├── ui.lua             # Interface moniteur
+    ├── server.lua         # Programme principal serveur
+    └── schematics/
+        └── exemple_maison.json
 ```
 
-Copie le contenu de `gps_host.lua` et modifie les coordonnées X, Y, Z 
-selon la position RÉELLE de ce computer.
+---
 
-Positions suggérées :
-- GPS 1 : x=0, y=255, z=0
-- GPS 2 : x=12, y=255, z=0  
-- GPS 3 : x=0, y=255, z=12
-- GPS 4 : x=6, y=260, z=6
+## 📦 Configuration GitHub
 
-### Étape 2 : Advanced Computer (Serveur)
+### 1. Créez votre repository
 
-1. Place un Advanced Computer
-2. Attache un Wireless Modem (ou Ender Modem)
-3. Attache un Advanced Monitor 3x2 (3 large, 2 haut)
-4. Copie ces fichiers :
-   - `server.lua` → programme principal
-   - `ui.lua` → interface moniteur
+1. Allez sur [github.com](https://github.com) et créez un nouveau repository
+2. Nommez-le `schematic-builder` (ou ce que vous voulez)
+3. Rendez-le **Public** (requis pour que CC puisse télécharger)
 
-Pour lancer : `server`
+### 2. Uploadez les fichiers
 
-### Étape 3 : Turtle
+Uploadez tous les fichiers en respectant la structure ci-dessus.
 
-1. Place une Mining Turtle ou Turtle avec Pickaxe
-2. Attache un Wireless Modem
-3. Copie ces fichiers :
-   - `builder.lua` → programme principal
-   - `nbt.lua` → parser de schematics
-   - `movement.lua` → gestion des déplacements
+### 3. Modifiez l'installer
 
-Pour lancer : `builder`
+Dans `installer.lua`, changez ces lignes :
 
-### Étape 4 : Upload des Schematics
-
-#### Option A : Pastebin
-```
-pastebin get <code> schematics/maison.schematic
+```lua
+local GITHUB_USER = "VOTRE_USERNAME"    -- Votre nom d'utilisateur GitHub
+local GITHUB_REPO = "schematic-builder"  -- Nom de votre repo
+local GITHUB_BRANCH = "main"             -- Branche (main ou master)
 ```
 
-#### Option B : Fichier direct
-Place le fichier dans le dossier `schematics/` du serveur.
+---
 
-**IMPORTANT** : Les .schematic sont compressés en GZIP.
-Tu dois les décompresser AVANT l'upload :
-1. Renomme ton fichier .schematic en .schematic.gz
-2. Décompresse avec 7-zip ou gunzip
-3. Upload le fichier décompressé
+## 🔧 Installation Manuelle
 
-OU utilise le format JSON simplifié (voir schema_format.json)
+### GPS Hosts (4 machines en hauteur)
 
-## Utilisation
+```
+wget https://raw.githubusercontent.com/USER/REPO/main/installer.lua installer
+installer
+-- Choisir "GPS Host"
+-- Entrer les coordonnées X, Y, Z
+```
+
+**Positions recommandées** (espacement min 6 blocs, hauteur 200+) :
+| Host | X | Y | Z |
+|------|-----|-----|-----|
+| 1 | 0 | 255 | 0 |
+| 2 | 12 | 255 | 0 |
+| 3 | 0 | 255 | 12 |
+| 4 | 6 | 260 | 6 |
+
+### Serveur (Advanced Computer + Moniteur 3x2)
+
+```
+wget run https://raw.githubusercontent.com/USER/REPO/main/installer.lua
+-- L'installer détecte automatiquement le moniteur
+```
+
+### Turtle (Mining Turtle + Wireless Modem)
+
+```
+wget run https://raw.githubusercontent.com/USER/REPO/main/installer.lua
+-- L'installer détecte automatiquement la turtle
+```
+
+---
+
+## 🎮 Utilisation
+
+### Démarrage
+
+1. **GPS Hosts** : Redémarrez-les, ils démarrent automatiquement
+2. **Serveur** : `server`
+3. **Turtle** : `builder`
 
 ### Interface Moniteur
 
 ```
 ┌─────────────────────────────────────┐
-│  SCHEMATIC BUILDER v1.0             │
+│    SCHEMATIC BUILDER v1.0           │
 ├─────────────────────────────────────┤
-│  [1] Charger Schematic              │
-│  [2] Config Coffres                 │
-│  [3] Config Position                │
-│  [4] Démarrer Construction          │
-│  [5] Pause/Reprendre                │
+│  [1. Charger]    [4. Matériaux]     │
+│  [2. Coffres]    [5. CONSTRUIRE]    │
+│  [3. Position]   [6. Pause]         │
 ├─────────────────────────────────────┤
 │  Status: En attente                 │
 │  Couche: 0/0  Blocs: 0/0            │
-│  Fuel: 1000  Matériaux: OK          │
+│  [===========----------] 45%        │
+│  Fuel: 1000   Pos: 100,64,200       │
 └─────────────────────────────────────┘
 ```
 
-### Contrôles tactiles
-- Touche le bouton correspondant sur le moniteur
-- La vue 2D montre la couche actuelle en cours
+### Workflow
 
-## Format JSON Alternatif
+1. **Charger un Schematic** : Sélectionnez un fichier dans le dossier `schematics/`
+2. **Config Coffres** : Définissez les coordonnées du coffre fuel et matériaux
+3. **Config Position** : Définissez où la construction commence + direction (N/E/S/O)
+4. **Matériaux** : Assignez chaque type de bloc à un slot de la turtle (1-16)
+5. **Construire** : Lancez la construction!
 
-Si le parsing NBT pose problème, utilise ce format :
+---
+
+## 📄 Format des Schematics
+
+### Format JSON (Recommandé)
+
+Plus simple à créer et modifier :
 
 ```json
 {
-  "width": 5,
-  "height": 3,
-  "length": 5,
-  "palette": {
-    "0": "minecraft:air",
-    "1": "minecraft:stone",
-    "2": "minecraft:oak_planks"
-  },
-  "blocks": [
-    [[1,1,1,1,1], [1,0,0,0,1], [1,1,1,1,1]],
-    [[1,0,0,0,1], [0,0,0,0,0], [1,0,0,0,1]],
-    [[1,1,1,1,1], [1,0,0,0,1], [1,1,1,1,1]]
-  ]
+    "name": "Ma Construction",
+    "width": 5,
+    "height": 3,
+    "length": 5,
+    "palette": {
+        "0": "minecraft:air",
+        "1": "minecraft:stone",
+        "2": "minecraft:oak_planks"
+    },
+    "blocks": [
+        [
+            [1,1,1,1,1],
+            [1,0,0,0,1],
+            [1,1,1,1,1]
+        ],
+        [
+            [1,0,0,0,1],
+            [0,0,0,0,0],
+            [1,0,0,0,1]
+        ],
+        [
+            [2,2,2,2,2],
+            [2,2,2,2,2],
+            [2,2,2,2,2]
+        ]
+    ]
 }
 ```
 
-## Mapping des blocs
+Structure : `blocks[Y][Z][X]` (couche → rangée → colonne)
 
-La turtle a besoin de savoir quel slot contient quel bloc.
-Configure cela via le moniteur dans "Config Matériaux".
+### Format .schematic (MCEdit)
 
-## Dépannage
+⚠️ **Important** : Les fichiers .schematic sont compressés en GZIP.
+
+1. Renommez votre fichier `.schematic` en `.schematic.gz`
+2. Décompressez avec 7-zip ou `gunzip`
+3. Uploadez le fichier décompressé
+
+---
+
+## 🔧 Dépannage
+
+### "GPS non disponible"
+- Vérifiez que les 4 GPS hosts sont allumés
+- Vérifiez l'espacement (minimum 6 blocs)
+- Vérifiez que tous ont des wireless modems
+
+### "Connexion impossible"
+- Vérifiez que HTTP est activé dans la config ComputerCraft
+- Vérifiez que le repo GitHub est public
 
 ### La turtle ne bouge pas
-- Vérifie le fuel : `refuel all`
-- Vérifie le GPS : `gps locate`
-
-### GPS ne fonctionne pas
-- Vérifie que les 4 hosts sont allumés
-- Vérifie l'espacement (min 6 blocs)
-- Vérifie que tous ont des wireless modems
+- Vérifiez le fuel : `refuel all`
+- Vérifiez la connexion au serveur
 
 ### Erreur de parsing schematic
-- Assure-toi que le fichier est décompressé
-- Essaie le format JSON alternatif
+- Utilisez le format JSON à la place
+- Assurez-vous que le .schematic est décompressé
 
-## Fichiers
+---
 
-| Fichier | Destination | Description |
-|---------|-------------|-------------|
-| gps_host.lua | GPS Computers | Programme GPS (startup.lua) |
-| nbt.lua | Turtle | Parser NBT/Schematic |
-| movement.lua | Turtle | Gestion déplacements GPS |
-| builder.lua | Turtle | Programme principal turtle |
-| server.lua | Computer | Serveur de contrôle |
-| ui.lua | Computer | Interface moniteur |
+## 📐 Architecture
+
+```
+[GPS 1] [GPS 2] [GPS 3] [GPS 4]   ← En hauteur (y=200+)
+              ↓ wireless
+         [TURTLE] ←──wireless──→ [SERVER]
+           ↓   ↓                      ↓
+    [Coffre] [Coffre]           [Moniteur 3x2]
+     Fuel    Matériaux
+```
+
+---
+
+## 🎛️ Commandes Clavier (Serveur)
+
+| Touche | Action |
+|--------|--------|
+| Q | Quitter |
+| R | Rafraîchir l'écran |
+| P | Ping la turtle |
+
+---
+
+## 📜 License
+
+MIT License - Libre d'utilisation et modification.
