@@ -1,50 +1,71 @@
 -- ============================================
--- GPS HOST - startup.lua
--- Place sur chaque Advanced Computer GPS
+-- GPS HOST - ComputerCraft
 -- ============================================
--- MODIFIE CES COORDONNEES selon la position
--- REELLE de ce computer dans le monde !
+-- IMPORTANT: Pour eviter "ambiguous position"
+--
+-- Vous avez besoin de 4 GPS hosts minimum.
+-- AU MOINS 1 doit etre a une hauteur Y differente!
+--
+-- Exemple de configuration correcte:
+--   Host 1: X=100, Y=200, Z=100
+--   Host 2: X=112, Y=200, Z=100
+--   Host 3: X=100, Y=200, Z=112
+--   Host 4: X=106, Y=210, Z=106  <- PLUS HAUT!
+--
+-- Espacement minimum: 6 blocs entre chaque host
 -- ============================================
 
-local X = 0      -- Coordonnée X de ce computer
-local Y = 255    -- Coordonnée Y de ce computer  
-local Z = 0      -- Coordonnée Z de ce computer
+-- MODIFIEZ CES COORDONNEES (F3 dans Minecraft)
+local X = 0
+local Y = 255
+local Z = 0
 
 -- ============================================
--- NE PAS MODIFIER EN DESSOUS
+-- NE PAS MODIFIER CI-DESSOUS
 -- ============================================
 
--- Cherche le modem wireless
-local modem = nil
+-- Trouve le modem wireless
+local modemSide = nil
 for _, side in ipairs({"top", "bottom", "left", "right", "front", "back"}) do
     if peripheral.isPresent(side) and peripheral.getType(side) == "modem" then
         local m = peripheral.wrap(side)
-        if m.isWireless() then
-            modem = side
+        if m.isWireless and m.isWireless() then
+            modemSide = side
             break
         end
     end
 end
 
-if not modem then
-    print("ERREUR: Aucun modem wireless trouve!")
-    print("Attache un Wireless Modem a ce computer.")
+if not modemSide then
+    print("=============================")
+    print("ERREUR: Wireless Modem requis")
+    print("=============================")
+    print("")
+    print("Attachez un Wireless Modem ou")
+    print("un Ender Modem a ce computer.")
     return
 end
 
-print("=================================")
-print("   GPS HOST - ComputerCraft")
-print("=================================")
+-- Affichage
+term.clear()
+term.setCursorPos(1, 1)
+
+print("=============================")
+print("      GPS HOST ACTIF")
+print("=============================")
 print("")
-print("Position configuree:")
+print("Position:")
 print("  X = " .. X)
 print("  Y = " .. Y)
 print("  Z = " .. Z)
 print("")
-print("Modem: " .. modem)
+print("Modem: " .. modemSide)
 print("")
-print("Demarrage du service GPS...")
+print("-----------------------------")
+print("RAPPEL: 4 hosts necessaires")
+print("1 host doit etre plus haut!")
+print("-----------------------------")
 print("")
 
--- Lance le host GPS
+-- Lance le GPS
 shell.run("gps", "host", X, Y, Z)

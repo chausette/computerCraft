@@ -1,15 +1,14 @@
 -- ============================================
--- INSTALLER.lua - Installateur Universel
+-- INSTALLER.lua - Installateur & Updater
 -- Schematic Builder pour ComputerCraft
 -- ============================================
--- Installation:
--- pastebin run <CODE>
--- ou
 -- wget run https://raw.githubusercontent.com/chausette/computerCraft/master/schematic-builder/installer.lua
 -- ============================================
 
+local VERSION = "1.1"
+
 -- ===========================================
--- CONFIGURATION - MODIFIEZ CES VALEURS
+-- CONFIGURATION
 -- ===========================================
 
 local GITHUB_USER = "chausette"
@@ -17,78 +16,80 @@ local GITHUB_REPO = "computerCraft"
 local GITHUB_BRANCH = "master"
 local GITHUB_DIRECTORY = "schematic-builder"
 
+local BASE_URL = "https://raw.githubusercontent.com/" .. GITHUB_USER .. "/" .. GITHUB_REPO .. "/" .. GITHUB_BRANCH .. "/" .. GITHUB_DIRECTORY .. "/"
+
 -- ===========================================
--- NE PAS MODIFIER EN DESSOUS
+-- AFFICHAGE
 -- ===========================================
 
-local BASE_URL = "https://raw.githubusercontent.com/" .. GITHUB_USER .. "/" .. GITHUB_REPO .. "/" .. GITHUB_BRANCH .. "/" .. GITHUB_DIRECTORY .."/"
-
--- Couleurs
 local function setColor(color)
     if term.isColor() then
         term.setTextColor(color)
     end
 end
 
--- Affichage
+local function setBgColor(color)
+    if term.isColor() then
+        term.setBackgroundColor(color)
+    end
+end
+
 local function printHeader()
     term.clear()
     term.setCursorPos(1, 1)
-    setColor(colors.yellow)
-    print("========================================")
-    print("   SCHEMATIC BUILDER - INSTALLATEUR")
-    print("========================================")
+    setBgColor(colors.blue)
     setColor(colors.white)
+    term.clearLine()
+    print("  SCHEMATIC BUILDER v" .. VERSION)
+    setBgColor(colors.black)
     print("")
 end
 
-local function printSuccess(msg)
+local function printOK(msg)
     setColor(colors.lime)
     print("[OK] " .. msg)
     setColor(colors.white)
 end
 
-local function printError(msg)
+local function printErr(msg)
     setColor(colors.red)
-    print("[ERREUR] " .. msg)
+    print("[X] " .. msg)
     setColor(colors.white)
 end
 
 local function printInfo(msg)
     setColor(colors.lightBlue)
-    print("[INFO] " .. msg)
+    print("[i] " .. msg)
     setColor(colors.white)
 end
 
-local function printWarning(msg)
+local function printWarn(msg)
     setColor(colors.orange)
-    print("[ATTENTION] " .. msg)
+    print("[!] " .. msg)
     setColor(colors.white)
 end
 
--- Detection du type de machine
+-- ===========================================
+-- DETECTION
+-- ===========================================
+
 local function detectMachine()
     if turtle then
         return "turtle"
     elseif pocket then
         return "pocket"
     else
-        -- Verifie si c'est un GPS host potentiel
         local hasWirelessModem = false
+        local hasMonitor = peripheral.find("monitor") ~= nil
+        
         for _, side in ipairs({"top", "bottom", "left", "right", "front", "back"}) do
-            if peripheral.isPresent(side) then
-                local pType = peripheral.getType(side)
-                if pType == "modem" then
-                    local m = peripheral.wrap(side)
-                    if m.isWireless and m.isWireless() then
-                        hasWirelessModem = true
-                    end
+            if peripheral.isPresent(side) and peripheral.getType(side) == "modem" then
+                local m = peripheral.wrap(side)
+                if m.isWireless and m.isWireless() then
+                    hasWirelessModem = true
                 end
             end
         end
-        
-        -- Verifie si un moniteur est connecte
-        local hasMonitor = peripheral.find("monitor") ~= nil
         
         if hasMonitor then
             return "server"
@@ -100,22 +101,33 @@ local function detectMachine()
     end
 end
 
--- Telecharge un fichier depuis GitHub
-local function downloadFile(remotePath, localPath)
+local function isInstalled(machineType)
+    if machineType == "turtle" then
+        return fs.exists("builder.lua")
+    elseif machineType == "server" then
+        return fs.exists("server.lua")
+    elseif machineType == "gps" then
+        return fs.exists("startup.lua")
+    end
+    return false
+end
+
+-- ===========================================
+-- TELECHARGEMENT
+-- ===========================================
+
+local function download(remotePath, localPath)
     local url = BASE_URL .. remotePath
     
-    -- Supprime le fichier existant
     if fs.exists(localPath) then
         fs.delete(localPath)
     end
     
-    -- Cree les dossiers parents si necessaire
     local dir = fs.getDir(localPath)
     if dir ~= "" and not fs.exists(dir) then
         fs.makeDir(dir)
     end
     
-    -- Telecharge
     local response = http.get(url)
     if response then
         local content = response.readAll()
@@ -128,11 +140,13 @@ local function downloadFile(remotePath, localPath)
             return true
         end
     end
-    
     return false
 end
 
--- Fichiers pour chaque type de machine
+-- ===========================================
+-- FICHIERS PAR TYPE
+-- ===========================================
+
 local machineFiles = {
     turtle = {
         {remote = "turtle/nbt.lua", local_ = "nbt.lua"},
@@ -148,115 +162,131 @@ local machineFiles = {
     }
 }
 
--- Installation pour Turtle
-local function installTurtle()
-    printInfo("Installation pour TURTLE detectee")
+-- ===========================================
+-- INSTALLATION TURTLE
+-- ===========================================
+
+local function installTurtle(isUpdate)
+    local action = isUpdate and "Mise a jour" or "Installation"
+    printInfo(action .. " TURTLE")
     print("")
     
     local success = true
     for _, file in ipairs(machineFiles.turtle) do
-        io.write("  Telechargement de " .. file.local_ .. "... ")
-        if downloadFile(file.remote, file.local_) then
-            printSuccess("OK")
+        io.write("  " .. file.local_ .. "... ")
+        if download(file.remote, file.local_) then
+            printOK("OK")
         else
-            printError("ECHEC")
+            printErr("ECHEC")
             success = false
         end
     end
     
     print("")
-    
     if success then
-        printSuccess("Installation terminee!")
+        printOK(action .. " terminee!")
         print("")
         setColor(colors.yellow)
-        print("Pour demarrer: builder")
-        print("")
-        print("Assurez-vous que:")
-        print("  - Le reseau GPS est en place")
-        print("  - Un wireless modem est attache")
+        print("Commande: builder")
         setColor(colors.white)
     else
-        printError("Installation incomplete!")
+        printErr(action .. " incomplete!")
     end
-    
     return success
 end
 
--- Installation pour Server
-local function installServer()
-    printInfo("Installation pour SERVEUR detectee")
+-- ===========================================
+-- INSTALLATION SERVEUR
+-- ===========================================
+
+local function installServer(isUpdate)
+    local action = isUpdate and "Mise a jour" or "Installation"
+    printInfo(action .. " SERVEUR")
     print("")
     
     local success = true
     for _, file in ipairs(machineFiles.server) do
-        io.write("  Telechargement de " .. file.local_ .. "... ")
-        if downloadFile(file.remote, file.local_) then
-            printSuccess("OK")
+        io.write("  " .. file.local_ .. "... ")
+        if download(file.remote, file.local_) then
+            printOK("OK")
         else
-            printError("ECHEC")
+            printErr("ECHEC")
             success = false
         end
     end
     
-    -- Cree le dossier schematics
     if not fs.exists("schematics") then
         fs.makeDir("schematics")
-        printInfo("Dossier 'schematics' cree")
     end
     
-    -- Telecharge l'exemple
-    io.write("  Telechargement exemple... ")
-    if downloadFile("computer/schematics/exemple_maison.json", "schematics/exemple_maison.json") then
-        printSuccess("OK")
-    else
-        printWarning("Optionnel - ignore")
+    if not isUpdate then
+        io.write("  exemple.json... ")
+        if download("computer/schematics/exemple_maison.json", "schematics/exemple_maison.json") then
+            printOK("OK")
+        else
+            printWarn("ignore")
+        end
     end
     
     print("")
-    
     if success then
-        printSuccess("Installation terminee!")
+        printOK(action .. " terminee!")
         print("")
         setColor(colors.yellow)
-        print("Pour demarrer: server")
-        print("")
-        print("Assurez-vous que:")
-        print("  - Un moniteur 3x2 est connecte")
-        print("  - Un wireless modem est attache")
+        print("Commande: server")
         setColor(colors.white)
     else
-        printError("Installation incomplete!")
+        printErr(action .. " incomplete!")
     end
-    
     return success
 end
 
--- Installation pour GPS Host
-local function installGPS()
-    printInfo("Installation pour GPS HOST")
+-- ===========================================
+-- INSTALLATION GPS
+-- ===========================================
+
+local function installGPS(isUpdate)
+    local action = isUpdate and "Mise a jour" or "Installation"
+    printInfo(action .. " GPS HOST")
     print("")
     
-    -- Demande les coordonnees
     setColor(colors.yellow)
-    print("Entrez les coordonnees de CE computer:")
-    print("(Utilisez F3 dans Minecraft pour les voir)")
-    print("")
+    print("Coordonnees de CE computer:")
+    print("(F3 dans Minecraft)")
     setColor(colors.white)
+    print("")
     
-    io.write("Coordonnee X: ")
-    local x = tonumber(read()) or 0
+    -- Charge les anciennes coordonnees si update
+    local oldX, oldY, oldZ = 0, 255, 0
+    if isUpdate and fs.exists("startup.lua") then
+        local f = fs.open("startup.lua", "r")
+        if f then
+            local content = f.readAll()
+            f.close()
+            oldX = tonumber(content:match("local X = (%-?%d+)")) or 0
+            oldY = tonumber(content:match("local Y = (%-?%d+)")) or 255
+            oldZ = tonumber(content:match("local Z = (%-?%d+)")) or 0
+        end
+    end
     
-    io.write("Coordonnee Y: ")
-    local y = tonumber(read()) or 0
+    io.write("X [" .. oldX .. "]: ")
+    local inputX = read()
+    local x = tonumber(inputX)
+    if not x or inputX == "" then x = oldX end
     
-    io.write("Coordonnee Z: ")
-    local z = tonumber(read()) or 0
+    io.write("Y [" .. oldY .. "]: ")
+    local inputY = read()
+    local y = tonumber(inputY)
+    if not y or inputY == "" then y = oldY end
+    
+    io.write("Z [" .. oldZ .. "]: ")
+    local inputZ = read()
+    local z = tonumber(inputZ)
+    if not z or inputZ == "" then z = oldZ end
     
     print("")
     
-    -- Telecharge et modifie le fichier
-    io.write("Telechargement de gps_host.lua... ")
+    io.write("Telechargement... ")
     local url = BASE_URL .. "turtle/gps_host.lua"
     local response = http.get(url)
     
@@ -264,47 +294,52 @@ local function installGPS()
         local content = response.readAll()
         response.close()
         
-        -- Remplace les coordonnees
         content = content:gsub("local X = 0", "local X = " .. x)
         content = content:gsub("local Y = 255", "local Y = " .. y)
         content = content:gsub("local Z = 0", "local Z = " .. z)
         
-        -- Sauvegarde en tant que startup.lua
         local file = fs.open("startup.lua", "w")
         if file then
             file.write(content)
             file.close()
-            printSuccess("OK")
+            printOK("OK")
         else
-            printError("Impossible d'ecrire le fichier")
+            printErr("Ecriture impossible")
             return false
         end
     else
-        printError("Echec du telechargement")
+        printErr("Telechargement echoue")
         return false
     end
     
     print("")
-    printSuccess("Installation terminee!")
+    printOK(action .. " terminee!")
+    print("")
+    setColor(colors.lime)
+    print("Position: " .. x .. ", " .. y .. ", " .. z)
+    setColor(colors.white)
     print("")
     setColor(colors.yellow)
-    print("Position configuree: " .. x .. ", " .. y .. ", " .. z)
-    print("")
-    print("Le GPS demarrera automatiquement")
-    print("au prochain redemarrage.")
-    print("")
-    print("Pour demarrer maintenant: reboot")
+    print("IMPORTANT pour eviter 'ambiguous':")
+    print("  - 4 hosts minimum")
+    print("  - 1 host DOIT etre plus haut (+10 Y)")
+    print("  - Espacement min 6 blocs")
     setColor(colors.white)
+    print("")
+    print("Tapez 'reboot' pour demarrer")
     
     return true
 end
 
--- Menu de selection pour les cas ambigus
-local function showMenu()
+-- ===========================================
+-- MENU
+-- ===========================================
+
+local function showMenu(detected)
     print("Que voulez-vous installer?")
     print("")
     setColor(colors.yellow)
-    print("  1. Serveur (avec moniteur)")
+    print("  1. Serveur (moniteur)")
     print("  2. GPS Host")
     print("  3. Annuler")
     setColor(colors.white)
@@ -315,16 +350,48 @@ local function showMenu()
     print("")
     
     if choice == "1" then
-        return installServer()
+        return installServer(false)
     elseif choice == "2" then
-        return installGPS()
+        return installGPS(false)
     else
-        printInfo("Installation annulee")
+        printInfo("Annule")
         return false
     end
 end
 
--- Verifie la connexion internet
+local function showUpdateMenu(machineType)
+    print("Installation detectee!")
+    print("")
+    setColor(colors.yellow)
+    print("  1. Mettre a jour")
+    print("  2. Reinstaller")
+    print("  3. Annuler")
+    setColor(colors.white)
+    print("")
+    io.write("Choix [1-3]: ")
+    
+    local choice = read()
+    print("")
+    
+    if choice == "1" or choice == "2" then
+        local isUpdate = (choice == "1")
+        if machineType == "turtle" then
+            return installTurtle(isUpdate)
+        elseif machineType == "server" then
+            return installServer(isUpdate)
+        elseif machineType == "gps" then
+            return installGPS(isUpdate)
+        end
+    else
+        printInfo("Annule")
+        return false
+    end
+end
+
+-- ===========================================
+-- CONNEXION
+-- ===========================================
+
 local function checkInternet()
     local response = http.get("https://raw.githubusercontent.com")
     if response then
@@ -334,52 +401,63 @@ local function checkInternet()
     return false
 end
 
--- Programme principal
+-- ===========================================
+-- MAIN
+-- ===========================================
+
 local function main()
     printHeader()
     
-    -- Verifie la configuration
-    if GITHUB_USER == "VOTRE_USERNAME" then
-        printError("Configuration requise!")
-        print("")
-        print("Editez ce fichier et modifiez:")
-        setColor(colors.yellow)
-        print("  GITHUB_USER = \"votre_username\"")
-        print("  GITHUB_REPO = \"votre_repo\"")
-        setColor(colors.white)
-        print("")
-        return
-    end
-    
-    -- Verifie la connexion
-    printInfo("Verification de la connexion...")
+    io.write("Connexion... ")
     if not checkInternet() then
-        printError("Pas de connexion internet!")
+        printErr("Pas d'internet!")
         print("")
-        print("Verifiez que HTTP est active dans")
-        print("la configuration de ComputerCraft.")
+        print("Activez HTTP dans ComputerCraft.")
         return
     end
-    printSuccess("Connexion OK")
+    printOK("OK")
     print("")
     
-    -- Detecte le type de machine
     local machineType = detectMachine()
+    local installed = isInstalled(machineType)
     
     if machineType == "turtle" then
-        installTurtle()
+        if installed then
+            showUpdateMenu("turtle")
+        else
+            installTurtle(false)
+        end
+        
     elseif machineType == "server" then
-        installServer()
+        if installed then
+            showUpdateMenu("server")
+        else
+            installServer(false)
+        end
+        
     elseif machineType == "gps_or_server" then
-        -- Cas ambigu - demande a l'utilisateur
-        printWarning("Type de machine ambigu")
+        -- Verifie si c'est un GPS existant
+        if fs.exists("startup.lua") then
+            local f = fs.open("startup.lua", "r")
+            if f then
+                local content = f.readAll()
+                f.close()
+                if content:find("GPS HOST") then
+                    showUpdateMenu("gps")
+                    return
+                end
+            end
+        end
+        
+        printWarn("Type ambigu")
         print("")
         showMenu()
+        
     elseif machineType == "pocket" then
-        printError("Les Pocket Computers ne sont pas supportes")
+        printErr("Pocket non supporte")
+        
     else
-        -- Computer sans peripheriques detectes
-        printWarning("Aucun peripherique detecte")
+        printWarn("Aucun peripherique")
         print("")
         showMenu()
     end
@@ -387,5 +465,4 @@ local function main()
     print("")
 end
 
--- Lance le programme
 main()

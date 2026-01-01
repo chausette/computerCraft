@@ -1,60 +1,52 @@
 -- ============================================
--- SERVER.lua - Programme principal serveur
--- Advanced Computer avec moniteur 3x2
+-- SERVER.lua - Serveur Schematic Builder
+-- Version 1.1
 -- ============================================
 
 local ui = require("ui")
 
 -- ============================================
--- CONFIGURATION
+-- CONFIG
 -- ============================================
 
 local config = {
     serverChannel = 300,
     turtleChannel = 301,
-    
     fuelChest = nil,
     materialChest = nil,
     buildStart = nil,
     buildDirection = 0,
     slotMapping = {},
-    
     schematicsFolder = "schematics"
 }
 
 -- ============================================
--- ETAT
+-- STATE
 -- ============================================
 
 local state = {
-    -- Turtle
     x = 0, y = 0, z = 0,
     facing = 0,
     fuel = 0,
-    
-    -- Construction
     schematic = nil,
     schematicName = nil,
     schematicWidth = 0,
     schematicHeight = 0,
     schematicLength = 0,
     materials = {},
-    
     layer = 0,
     totalBlocks = 0,
     placedBlocks = 0,
-    
     status = "deconnecte",
     paused = false,
     building = false,
-    
-    -- UI
-    currentScreen = "main",
-    selectedSchematic = nil
+    screen = "main",
+    selectedFile = nil,
+    materialPage = 1
 }
 
 -- ============================================
--- COMMUNICATION
+-- MODEM
 -- ============================================
 
 local modem = nil
@@ -70,29 +62,27 @@ local function findModem()
     return false
 end
 
-local function sendToTurtle(msgType, data)
+local function send(msgType, data)
     if modem then
-        local message = {
+        modem.transmit(config.turtleChannel, config.serverChannel, {
             type = msgType,
             data = data
-        }
-        modem.transmit(config.turtleChannel, config.serverChannel, message)
+        })
     end
 end
 
 -- ============================================
--- GESTION DES FICHIERS
+-- FICHIERS
 -- ============================================
 
 local function loadConfig()
     if fs.exists("config.txt") then
-        local file = fs.open("config.txt", "r")
-        if file then
-            local content = file.readAll()
-            file.close()
-            local loaded = textutils.unserialize(content)
-            if loaded then
-                for k, v in pairs(loaded) do
+        local f = fs.open("config.txt", "r")
+        if f then
+            local data = textutils.unserialize(f.readAll())
+            f.close()
+            if data then
+                for k, v in pairs(data) do
                     config[k] = v
                 end
             end
@@ -101,368 +91,280 @@ local function loadConfig()
 end
 
 local function saveConfig()
-    local file = fs.open("config.txt", "w")
-    if file then
-        file.write(textutils.serialize(config))
-        file.close()
+    local f = fs.open("config.txt", "w")
+    if f then
+        f.write(textutils.serialize(config))
+        f.close()
     end
 end
 
 local function listSchematics()
     local files = {}
-    
     if not fs.exists(config.schematicsFolder) then
         fs.makeDir(config.schematicsFolder)
     end
-    
-    local list = fs.list(config.schematicsFolder)
-    for _, name in ipairs(list) do
-        local path = config.schematicsFolder .. "/" .. name
-        if not fs.isDir(path) then
+    for _, name in ipairs(fs.list(config.schematicsFolder)) do
+        if not fs.isDir(config.schematicsFolder .. "/" .. name) then
             table.insert(files, name)
         end
     end
-    
     table.sort(files)
     return files
 end
 
 -- ============================================
--- GESTION DES ECRANS
+-- REFRESH SCREEN
 -- ============================================
 
-local function refreshScreen()
-    if state.currentScreen == "main" then
-        ui.drawMainMenu(state)
-    elseif state.currentScreen == "chests" then
-        ui.drawChestConfig(config)
-    elseif state.currentScreen == "position" then
-        ui.drawPositionConfig(config)
-    elseif state.currentScreen == "schematics" then
-        local files = listSchematics()
-        ui.drawSchematicList(files, state.selectedSchematic)
-    elseif state.currentScreen == "materials" then
-        ui.drawMaterialConfig(state.materials, config.slotMapping)
+local function refresh()
+    if state.screen == "main" then
+        ui.drawMain(state)
+    elseif state.screen == "chests" then
+        ui.drawChests(config)
+    elseif state.screen == "position" then
+        ui.drawPosition(config)
+    elseif state.screen == "schematics" then
+        ui.drawSchematics(listSchematics(), state.selectedFile)
+    elseif state.screen == "materials" then
+        ui.drawMaterials(state.materials, config.slotMapping, state.materialPage)
     end
 end
 
-local function handleMainScreen(clicked)
+-- ============================================
+-- HANDLERS
+-- ============================================
+
+local function handleMain(clicked)
     if clicked == "load" then
-        state.currentScreen = "schematics"
-        state.selectedSchematic = nil
-        refreshScreen()
+        state.screen = "schematics"
+        state.selectedFile = nil
         
     elseif clicked == "chests" then
-        state.currentScreen = "chests"
-        refreshScreen()
+        state.screen = "chests"
         
     elseif clicked == "position" then
-        state.currentScreen = "position"
-        refreshScreen()
+        state.screen = "position"
         
     elseif clicked == "materials" then
-        state.currentScreen = "materials"
-        refreshScreen()
+        state.screen = "materials"
+        state.materialPage = 1
         
     elseif clicked == "build" then
         if state.building then
-            sendToTurtle("stop", {})
+            send("stop", {})
             state.building = false
-        else
-            if state.schematic then
-                sendToTurtle("set_config", {
-                    fuelChest = config.fuelChest,
-                    materialChest = config.materialChest,
-                    buildStart = config.buildStart,
-                    buildDirection = config.buildDirection,
-                    slotMapping = config.slotMapping
-                })
-                sleep(0.2)
-                sendToTurtle("start_build", {})
-                state.building = true
-            end
+        elseif state.schematic then
+            send("set_config", {
+                fuelChest = config.fuelChest,
+                materialChest = config.materialChest,
+                buildStart = config.buildStart,
+                buildDirection = config.buildDirection,
+                slotMapping = config.slotMapping
+            })
+            sleep(0.1)
+            send("start_build", {})
+            state.building = true
         end
-        refreshScreen()
         
     elseif clicked == "pause" then
         if state.building then
-            if state.paused then
-                sendToTurtle("resume", {})
-                state.paused = false
-            else
-                sendToTurtle("pause", {})
-                state.paused = true
-            end
+            state.paused = not state.paused
+            send(state.paused and "pause" or "resume", {})
         end
-        refreshScreen()
     end
+    refresh()
 end
 
-local function handleChestScreen(clicked, x, y)
+local function handleChests(clicked)
     if clicked == "back" then
-        state.currentScreen = "main"
-        refreshScreen()
+        state.screen = "main"
         
     elseif clicked == "save" then
         saveConfig()
-        state.currentScreen = "main"
-        refreshScreen()
+        state.screen = "main"
         
-    elseif clicked == "fuel_x" then
-        local val = ui.showNumberInput("Coffre Fuel - X", 
-            config.fuelChest and config.fuelChest.x or 0)
-        if val then
-            config.fuelChest = config.fuelChest or {}
-            config.fuelChest.x = val
-        end
-        refreshScreen()
+    elseif clicked == "fx" then
+        local v = ui.numberInput("Fuel X", config.fuelChest and config.fuelChest.x or 0)
+        if v then config.fuelChest = config.fuelChest or {}; config.fuelChest.x = v end
         
-    elseif clicked == "fuel_y" then
-        local val = ui.showNumberInput("Coffre Fuel - Y",
-            config.fuelChest and config.fuelChest.y or 0)
-        if val then
-            config.fuelChest = config.fuelChest or {}
-            config.fuelChest.y = val
-        end
-        refreshScreen()
+    elseif clicked == "fy" then
+        local v = ui.numberInput("Fuel Y", config.fuelChest and config.fuelChest.y or 0)
+        if v then config.fuelChest = config.fuelChest or {}; config.fuelChest.y = v end
         
-    elseif clicked == "fuel_z" then
-        local val = ui.showNumberInput("Coffre Fuel - Z",
-            config.fuelChest and config.fuelChest.z or 0)
-        if val then
-            config.fuelChest = config.fuelChest or {}
-            config.fuelChest.z = val
-        end
-        refreshScreen()
+    elseif clicked == "fz" then
+        local v = ui.numberInput("Fuel Z", config.fuelChest and config.fuelChest.z or 0)
+        if v then config.fuelChest = config.fuelChest or {}; config.fuelChest.z = v end
         
-    elseif clicked == "mat_x" then
-        local val = ui.showNumberInput("Coffre Materiaux - X",
-            config.materialChest and config.materialChest.x or 0)
-        if val then
-            config.materialChest = config.materialChest or {}
-            config.materialChest.x = val
-        end
-        refreshScreen()
+    elseif clicked == "mx" then
+        local v = ui.numberInput("Mat X", config.materialChest and config.materialChest.x or 0)
+        if v then config.materialChest = config.materialChest or {}; config.materialChest.x = v end
         
-    elseif clicked == "mat_y" then
-        local val = ui.showNumberInput("Coffre Materiaux - Y",
-            config.materialChest and config.materialChest.y or 0)
-        if val then
-            config.materialChest = config.materialChest or {}
-            config.materialChest.y = val
-        end
-        refreshScreen()
+    elseif clicked == "my" then
+        local v = ui.numberInput("Mat Y", config.materialChest and config.materialChest.y or 0)
+        if v then config.materialChest = config.materialChest or {}; config.materialChest.y = v end
         
-    elseif clicked == "mat_z" then
-        local val = ui.showNumberInput("Coffre Materiaux - Z",
-            config.materialChest and config.materialChest.z or 0)
-        if val then
-            config.materialChest = config.materialChest or {}
-            config.materialChest.z = val
-        end
-        refreshScreen()
+    elseif clicked == "mz" then
+        local v = ui.numberInput("Mat Z", config.materialChest and config.materialChest.z or 0)
+        if v then config.materialChest = config.materialChest or {}; config.materialChest.z = v end
     end
+    refresh()
 end
 
-local function handlePositionScreen(clicked, x, y)
+local function handlePosition(clicked)
     if clicked == "back" then
-        state.currentScreen = "main"
-        refreshScreen()
+        state.screen = "main"
         
     elseif clicked == "save" then
         saveConfig()
-        state.currentScreen = "main"
-        refreshScreen()
+        state.screen = "main"
         
-    elseif clicked == "start_x" then
-        local val = ui.showNumberInput("Position depart - X",
-            config.buildStart and config.buildStart.x or 0)
-        if val then
-            config.buildStart = config.buildStart or {}
-            config.buildStart.x = val
-        end
-        refreshScreen()
+    elseif clicked == "sx" then
+        local v = ui.numberInput("Start X", config.buildStart and config.buildStart.x or 0)
+        if v then config.buildStart = config.buildStart or {}; config.buildStart.x = v end
         
-    elseif clicked == "start_y" then
-        local val = ui.showNumberInput("Position depart - Y",
-            config.buildStart and config.buildStart.y or 0)
-        if val then
-            config.buildStart = config.buildStart or {}
-            config.buildStart.y = val
-        end
-        refreshScreen()
+    elseif clicked == "sy" then
+        local v = ui.numberInput("Start Y", config.buildStart and config.buildStart.y or 0)
+        if v then config.buildStart = config.buildStart or {}; config.buildStart.y = v end
         
-    elseif clicked == "start_z" then
-        local val = ui.showNumberInput("Position depart - Z",
-            config.buildStart and config.buildStart.z or 0)
-        if val then
-            config.buildStart = config.buildStart or {}
-            config.buildStart.z = val
-        end
-        refreshScreen()
+    elseif clicked == "sz" then
+        local v = ui.numberInput("Start Z", config.buildStart and config.buildStart.z or 0)
+        if v then config.buildStart = config.buildStart or {}; config.buildStart.z = v end
         
-    elseif clicked and clicked:match("^dir_") then
-        config.buildDirection = tonumber(clicked:sub(5))
-        refreshScreen()
+    elseif clicked and clicked:match("^dir%d$") then
+        config.buildDirection = tonumber(clicked:sub(4)) or 0
     end
+    refresh()
 end
 
-local function handleSchematicScreen(clicked, x, y)
+local function handleSchematics(clicked)
     if clicked == "back" then
-        state.currentScreen = "main"
-        refreshScreen()
+        state.screen = "main"
         
-    elseif clicked == "load" then
-        if state.selectedSchematic then
+    elseif clicked == "loadfile" then
+        if state.selectedFile then
             local files = listSchematics()
-            local filename = files[state.selectedSchematic]
-            if filename then
-                local path = config.schematicsFolder .. "/" .. filename
-                sendToTurtle("load_schematic", {path = path})
-                state.schematicName = filename
+            local name = files[state.selectedFile]
+            if name then
+                send("load_schematic", {path = config.schematicsFolder .. "/" .. name})
+                state.schematicName = name
             end
         end
-        state.currentScreen = "main"
-        refreshScreen()
+        state.screen = "main"
         
-    elseif clicked and clicked:match("^item_") then
-        local index = tonumber(clicked:sub(6))
-        state.selectedSchematic = index
-        refreshScreen()
+    elseif clicked and clicked:match("^item%d+$") then
+        state.selectedFile = tonumber(clicked:sub(5))
     end
+    refresh()
 end
 
-local function handleMaterialScreen(clicked, x, y)
+local function handleMaterials(clicked)
     if clicked == "back" then
-        state.currentScreen = "main"
-        refreshScreen()
+        state.screen = "main"
         
     elseif clicked == "save" then
         saveConfig()
-        state.currentScreen = "main"
-        refreshScreen()
+        state.screen = "main"
         
-    elseif clicked and clicked:match("^slot_") then
-        local blockId = tonumber(clicked:sub(6))
-        local currentSlot = config.slotMapping[blockId] or 1
-        local val = ui.showNumberInput("Slot pour bloc " .. blockId, currentSlot)
-        if val and val >= 1 and val <= 16 then
-            config.slotMapping[blockId] = val
+    elseif clicked == "nextpage" then
+        local W, H = ui.getSize()
+        local perPage = H - 4
+        local totalPages = math.ceil(#state.materials / perPage)
+        state.materialPage = (state.materialPage % totalPages) + 1
+        
+    elseif clicked and clicked:match("^slot%d+$") then
+        local id = tonumber(clicked:sub(5))
+        local v = ui.numberInput("Slot 1-16", config.slotMapping[id] or 1)
+        if v and v >= 1 and v <= 16 then
+            config.slotMapping[id] = v
         end
-        refreshScreen()
     end
+    refresh()
 end
 
 local function handleClick(x, y)
     local clicked = ui.checkClick(x, y)
     if not clicked then return end
     
-    if state.currentScreen == "main" then
-        handleMainScreen(clicked)
-    elseif state.currentScreen == "chests" then
-        handleChestScreen(clicked, x, y)
-    elseif state.currentScreen == "position" then
-        handlePositionScreen(clicked, x, y)
-    elseif state.currentScreen == "schematics" then
-        handleSchematicScreen(clicked, x, y)
-    elseif state.currentScreen == "materials" then
-        handleMaterialScreen(clicked, x, y)
+    if state.screen == "main" then handleMain(clicked)
+    elseif state.screen == "chests" then handleChests(clicked)
+    elseif state.screen == "position" then handlePosition(clicked)
+    elseif state.screen == "schematics" then handleSchematics(clicked)
+    elseif state.screen == "materials" then handleMaterials(clicked)
     end
 end
 
 -- ============================================
--- GESTION DES MESSAGES TURTLE
+-- MESSAGES TURTLE
 -- ============================================
 
-local function handleTurtleMessage(message)
-    if type(message) ~= "table" then return end
+local function handleMessage(msg)
+    if type(msg) ~= "table" then return end
     
-    local msgType = message.type
-    local data = message.data
-    
-    if msgType == "status" then
-        state.x = data.x or state.x
-        state.y = data.y or state.y
-        state.z = data.z or state.z
-        state.facing = data.facing or state.facing
-        state.fuel = data.fuel or state.fuel
-        state.layer = data.layer or state.layer
-        state.totalBlocks = data.totalBlocks or state.totalBlocks
-        state.placedBlocks = data.placedBlocks or state.placedBlocks
-        state.status = data.status or state.status
-        state.paused = data.paused or false
-        state.building = data.building or false
+    if msg.type == "status" then
+        local d = msg.data
+        state.x = d.x or state.x
+        state.y = d.y or state.y
+        state.z = d.z or state.z
+        state.facing = d.facing or state.facing
+        state.fuel = d.fuel or state.fuel
+        state.layer = d.layer or state.layer
+        state.totalBlocks = d.totalBlocks or state.totalBlocks
+        state.placedBlocks = d.placedBlocks or state.placedBlocks
+        state.status = d.status or state.status
+        state.paused = d.paused or false
+        state.building = d.building or false
+        if state.screen == "main" then refresh() end
         
-        if state.currentScreen == "main" then
-            refreshScreen()
-        end
-        
-    elseif msgType == "schematic_loaded" then
+    elseif msg.type == "schematic_loaded" then
+        local d = msg.data
         state.schematic = true
-        state.schematicWidth = data.width
-        state.schematicHeight = data.height
-        state.schematicLength = data.length
-        state.totalBlocks = data.totalBlocks
-        state.materials = data.materials
+        state.schematicWidth = d.width
+        state.schematicHeight = d.height
+        state.schematicLength = d.length
+        state.totalBlocks = d.totalBlocks
+        state.materials = d.materials
         state.status = "pret"
-        
-        -- Auto-assigne les slots
         for i, mat in ipairs(state.materials) do
             if i <= 16 and not config.slotMapping[mat.id] then
                 config.slotMapping[mat.id] = i
             end
         end
+        if state.screen == "main" then refresh() end
         
-        if state.currentScreen == "main" then
-            refreshScreen()
-        end
+    elseif msg.type == "error" then
+        state.status = "err:" .. (msg.data.message or "?"):sub(1, 12)
+        if state.screen == "main" then refresh() end
         
-    elseif msgType == "error" then
-        state.status = "erreur: " .. (data.message or "inconnue")
-        if state.currentScreen == "main" then
-            refreshScreen()
-        end
-        
-    elseif msgType == "calibrated" then
-        state.x = data.x
-        state.y = data.y
-        state.z = data.z
-        state.facing = data.facing
+    elseif msg.type == "calibrated" or msg.type == "position_set" then
+        local d = msg.data
+        state.x = d.x
+        state.y = d.y
+        state.z = d.z
+        state.facing = d.facing
         state.status = "calibre"
-        refreshScreen()
-        
-    elseif msgType == "config_updated" then
-        state.status = "config OK"
-        refreshScreen()
+        refresh()
     end
 end
 
 -- ============================================
--- BOUCLE PRINCIPALE
+-- BOUCLES
 -- ============================================
 
 local function eventLoop()
     while true do
-        local event, p1, p2, p3, p4, p5 = os.pullEvent()
+        local event, p1, p2, p3, p4 = os.pullEvent()
         
         if event == "monitor_touch" then
             handleClick(p2, p3)
             
-        elseif event == "modem_message" then
-            local channel = p2
-            local message = p4
-            if channel == config.serverChannel then
-                handleTurtleMessage(message)
-            end
+        elseif event == "modem_message" and p2 == config.serverChannel then
+            handleMessage(p4)
             
         elseif event == "key" then
-            local key = p1
-            if key == keys.q then
-                return
-            elseif key == keys.r then
-                refreshScreen()
-            elseif key == keys.p then
-                sendToTurtle("ping", {})
+            if p1 == keys.q then return
+            elseif p1 == keys.r then refresh()
+            elseif p1 == keys.p then send("ping", {})
+            elseif p1 == keys.c then send("calibrate", {})
             end
         end
     end
@@ -470,67 +372,55 @@ end
 
 local function pingLoop()
     while true do
-        sendToTurtle("ping", {})
+        send("ping", {})
         sleep(5)
     end
 end
 
 -- ============================================
--- DEMARRAGE
+-- MAIN
 -- ============================================
 
 local function main()
     term.clear()
     term.setCursorPos(1, 1)
-    print("=================================")
-    print("   SCHEMATIC BUILDER SERVER")
-    print("=================================")
-    print("")
     
-    -- Charge la config
+    print("SCHEMATIC BUILDER SERVER v1.1")
+    print(string.rep("-", 30))
+    
     loadConfig()
-    print("Configuration chargee")
+    print("Config OK")
     
-    -- Trouve le modem
     if not findModem() then
-        print("ERREUR: Pas de modem trouve!")
+        print("ERREUR: Modem non trouve!")
         return
     end
-    print("Modem trouve - Canal " .. config.serverChannel)
+    print("Modem: " .. config.serverChannel .. "/" .. config.turtleChannel)
     
-    -- Initialise l'interface
-    local success, err = ui.init()
-    if not success then
+    local ok, err = ui.init()
+    if not ok then
         print("ERREUR: " .. err)
         return
     end
-    print("Moniteur initialise")
+    local W, H = ui.getSize()
+    print("Moniteur: " .. W .. "x" .. H)
     
-    -- Cree le dossier schematics
     if not fs.exists(config.schematicsFolder) then
         fs.makeDir(config.schematicsFolder)
     end
-    print("Dossier schematics: " .. config.schematicsFolder)
     
     print("")
-    print("Interface prete!")
-    print("Touches: Q=Quitter, R=Rafraichir, P=Ping")
+    print("Q=Quit R=Refresh P=Ping C=Calib")
     print("")
     
-    -- Affiche l'ecran principal
-    state.currentScreen = "main"
-    refreshScreen()
+    state.screen = "main"
+    refresh()
+    send("ping", {})
     
-    -- Ping initial
-    sendToTurtle("ping", {})
-    
-    -- Lance les boucles
     parallel.waitForAny(eventLoop, pingLoop)
     
-    -- Nettoyage
     ui.clear()
     term.clear()
-    print("Serveur arrete.")
 end
 
 main()

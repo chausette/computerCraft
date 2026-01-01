@@ -433,6 +433,20 @@ local function handleMessage(message)
         else
             sendToServer("error", {message = "GPS non disponible"})
         end
+        
+    elseif msgType == "set_position" then
+        -- Configuration manuelle de la position (sans GPS)
+        movement.setPos(data.x or 0, data.y or 0, data.z or 0)
+        if data.facing then
+            movement.setFacing(data.facing)
+        end
+        sendToServer("position_set", {
+            x = movement.x,
+            y = movement.y,
+            z = movement.z,
+            facing = movement.facing
+        })
+        sendStatus()
     end
 end
 
@@ -463,10 +477,11 @@ local function main()
             print("Direction: " .. movement.getFacingName())
         else
             print("ATTENTION: Calibration echouee")
+            print("Direction par defaut: Nord")
         end
     else
         print("ATTENTION: GPS non disponible")
-        print("Utilisation position relative")
+        print("Position configurable via serveur")
     end
     
     print("")
