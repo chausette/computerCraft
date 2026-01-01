@@ -28,6 +28,7 @@ local state = {
     x = 0, y = 0, z = 0,
     facing = 0,
     fuel = 0,
+    fuelEstimate = 0,
     schematic = nil,
     schematicName = nil,
     schematicWidth = 0,
@@ -42,7 +43,9 @@ local state = {
     building = false,
     screen = "main",
     selectedFile = nil,
-    materialPage = 1
+    materialPage = 1,
+    missingMaterials = {},
+    missingLayer = 0
 }
 
 -- ============================================
@@ -131,6 +134,8 @@ local function refresh()
         ui.drawTurtle(state)
     elseif state.screen == "direction" then
         ui.drawDirectionChoice(state.tempDirection or 0)
+    elseif state.screen == "missing" then
+        ui.drawMissingMaterials(state.missingMaterials, state.missingLayer)
     end
 end
 
@@ -351,6 +356,15 @@ local function handleDirection(clicked)
     refresh()
 end
 
+local function handleMissing(clicked)
+    if clicked == "continue" then
+        send("continue_build", {})
+        state.screen = "main"
+        state.missingMaterials = {}
+    end
+    refresh()
+end
+
 local function handleClick(x, y)
     local clicked = ui.checkClick(x, y)
     if not clicked then return end
@@ -362,6 +376,7 @@ local function handleClick(x, y)
     elseif state.screen == "materials" then handleMaterials(clicked)
     elseif state.screen == "turtle" then handleTurtle(clicked)
     elseif state.screen == "direction" then handleDirection(clicked)
+    elseif state.screen == "missing" then handleMissing(clicked)
     end
 end
 
@@ -379,6 +394,7 @@ local function handleMessage(msg)
         state.z = d.z or state.z
         state.facing = d.facing or state.facing
         state.fuel = d.fuel or state.fuel
+        state.fuelEstimate = d.fuelEstimate or state.fuelEstimate
         state.layer = d.layer or state.layer
         state.totalBlocks = d.totalBlocks or state.totalBlocks
         state.placedBlocks = d.placedBlocks or state.placedBlocks
@@ -394,14 +410,25 @@ local function handleMessage(msg)
         state.schematicHeight = d.height
         state.schematicLength = d.length
         state.totalBlocks = d.totalBlocks
+        state.fuelEstimate = d.fuelEstimate or 0
         state.materials = d.materials
         state.status = "pret"
+        
+        -- Auto-assigne les slots
         for i, mat in ipairs(state.materials) do
-            if i <= 16 and not config.slotMapping[mat.id] then
+            if i <= 15 and not config.slotMapping[mat.id] then
                 config.slotMapping[mat.id] = i
             end
         end
+        
         if state.screen == "main" then refresh() end
+        
+    elseif msg.type == "missing_materials" then
+        local d = msg.data
+        state.missingMaterials = d.materials or {}
+        state.missingLayer = d.layer or 0
+        state.screen = "missing"
+        refresh()
         
     elseif msg.type == "error" then
         state.status = "err:" .. (msg.data.message or "?"):sub(1, 12)

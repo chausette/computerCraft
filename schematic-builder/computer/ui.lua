@@ -243,14 +243,24 @@ function ui.drawMain(state)
     end
     
     -- Infos turtle
-    y = H - 1
+    y = H - 2
     ui.setColor(C.textDim, C.bg)
     ui.write(2, y, "Fuel:")
     ui.setColor(state.fuel and state.fuel < 100 and C.error or C.text, C.bg)
     mon.write(tostring(state.fuel or 0))
     
+    -- Fuel estime
+    if state.fuelEstimate and state.fuelEstimate > 0 then
+        ui.setColor(C.textDim, C.bg)
+        mon.write("/")
+        local fuelColor = (state.fuel or 0) >= state.fuelEstimate and C.success or C.warning
+        ui.setColor(fuelColor, C.bg)
+        mon.write(tostring(state.fuelEstimate))
+    end
+    
+    y = H - 1
     ui.setColor(C.textDim, C.bg)
-    ui.write(midX, y, "Pos:")
+    ui.write(2, y, "Pos:")
     ui.setColor(C.text, C.bg)
     mon.write(string.format("%d,%d,%d", state.x or 0, state.y or 0, state.z or 0))
 end
@@ -387,7 +397,7 @@ function ui.drawSchematics(files, selected)
 end
 
 -- ============================================
--- ECRAN MATERIAUX
+-- ECRAN MATERIAUX (avec quantites)
 -- ============================================
 
 function ui.drawMaterials(materials, slots, page)
@@ -402,18 +412,31 @@ function ui.drawMaterials(materials, slots, page)
     local y = 3
     local startIdx = (page - 1) * perPage + 1
     
+    -- En-tete
+    ui.setColor(C.textDim, C.bg)
+    ui.write(2, y, "Bloc")
+    ui.write(W - 18, y, "Qte")
+    ui.write(W - 8, y, "Slot")
+    y = y + 1
+    
     for i = startIdx, math.min(#materials, startIdx + perPage - 1) do
         local mat = materials[i]
-        local slot = slots[mat.id] or i
+        local slot = slots[mat.id] or "-"
         
+        -- Nom du bloc (raccourci)
         ui.setColor(C.text, C.bg)
         local name = mat.name:gsub("minecraft:", "")
-        if #name > W - 12 then
-            name = name:sub(1, W - 14) .. ".."
+        if #name > W - 22 then
+            name = name:sub(1, W - 24) .. ".."
         end
         ui.write(2, y, name)
         
-        ui.button(W - 8, y, 7, "S:" .. slot, false, "slot" .. mat.id)
+        -- Quantite
+        ui.setColor(C.accent, C.bg)
+        ui.write(W - 18, y, tostring(mat.count or 0))
+        
+        -- Slot (cliquable)
+        ui.button(W - 8, y, 7, ">" .. tostring(slot), false, "slot" .. mat.id)
         
         y = y + 1
     end
@@ -427,6 +450,57 @@ function ui.drawMaterials(materials, slots, page)
     end
     
     ui.button(W - btnW - 1, H - 1, btnW, "Sauver", true, "save")
+end
+
+-- ============================================
+-- ECRAN MATERIAUX MANQUANTS
+-- ============================================
+
+function ui.drawMissingMaterials(missing, layer)
+    ui.clear()
+    ui.header("MATERIAUX MANQUANTS")
+    
+    local y = 3
+    
+    ui.setColor(C.warning, C.bg)
+    ui.center(y, "Couche " .. (layer or "?") .. " - Il manque:")
+    y = y + 2
+    
+    if missing and #missing > 0 then
+        for i, mat in ipairs(missing) do
+            if y < H - 2 then
+                ui.setColor(C.text, C.bg)
+                local name = (mat.name or "?"):gsub("minecraft:", "")
+                if #name > W - 16 then
+                    name = name:sub(1, W - 18) .. ".."
+                end
+                ui.write(2, y, name)
+                
+                ui.setColor(C.error, C.bg)
+                ui.write(W - 12, y, "x" .. (mat.count or 0))
+                
+                if mat.slot then
+                    ui.setColor(C.textDim, C.bg)
+                    ui.write(W - 5, y, "S" .. mat.slot)
+                end
+                
+                y = y + 1
+            end
+        end
+    else
+        ui.setColor(C.textDim, C.bg)
+        ui.center(y, "Liste non disponible")
+    end
+    
+    -- Bouton continuer
+    y = H - 1
+    local btnW = math.floor(W / 2) - 2
+    
+    ui.setColor(C.textDim, C.bg)
+    ui.write(2, H - 3, "Remplissez les slots et")
+    ui.write(2, H - 2, "cliquez Continuer")
+    
+    ui.button(W - btnW - 1, y, btnW, "Continuer", true, "continue")
 end
 
 -- ============================================
