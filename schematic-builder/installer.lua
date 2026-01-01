@@ -12,9 +12,9 @@
 -- CONFIGURATION - MODIFIEZ CES VALEURS
 -- ===========================================
 
-local GITHUB_USER = "VOTRE_USERNAME"
+local GITHUB_USER = "chausette"
 local GITHUB_REPO = "schematic-builder"
-local GITHUB_BRANCH = "main"
+local GITHUB_BRANCH = "master"
 
 -- ===========================================
 -- NE PAS MODIFIER EN DESSOUS
