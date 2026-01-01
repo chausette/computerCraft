@@ -13,8 +13,8 @@ local nbt = require("nbt")
 
 local config = {
     -- Communication
-    serverChannel = 100,
-    turtleChannel = 101,
+    serverChannel = 300,
+    turtleChannel = 301,
     
     -- Coffres (configures via le serveur)
     fuelChest = nil,      -- {x, y, z}
