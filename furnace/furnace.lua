@@ -1,12 +1,11 @@
 -- ============================================
--- FURNACE MANAGER v2.0
+-- FURNACE MANAGER v2.1
 -- Gestionnaire automatique de fours
 -- https://github.com/chausette/computerCraft
 -- ============================================
 
-local VERSION = "2.0"
+local VERSION = "2.1"
 local CONFIG_FILE = "furnace_config"
-local STATS_FILE = "furnace_stats"
 
 -- Configuration par defaut
 local config = {
@@ -67,7 +66,7 @@ local SMELTABLE_ORES = {
 
 -- Temps de cuisson par type de four (en ticks, 20 ticks = 1 seconde)
 local COOK_TIMES = {
-    furnace = 200,      -- 10 secondes
+    furnace = 200,       -- 10 secondes
     blast_furnace = 100, -- 5 secondes
     smoker = 100,        -- 5 secondes
 }
@@ -117,7 +116,6 @@ local function getItemName(item)
     local name = item.name or "Inconnu"
     name = string.gsub(name, "minecraft:", "")
     name = string.gsub(name, "_", " ")
-    -- Capitaliser et tronquer
     name = name:sub(1,1):upper() .. name:sub(2)
     return name
 end
@@ -141,6 +139,26 @@ local function getFurnaceType(name)
     else
         return "furnace"
     end
+end
+
+-- Initialiser les donnees d'un four
+local function initFurnaceData(name, fType)
+    return {
+        item = "Vide",
+        itemName = nil,
+        count = 0,              -- Items restants dans le four
+        initialCount = 0,       -- Quantite initiale du batch
+        cookedCount = 0,        -- Items cuits dans ce batch
+        progress = 0,           -- Pourcentage global du batch
+        currentItemProgress = 0, -- Progression de l'item en cours (0-100)
+        fuel = 0,
+        cooking = false,
+        itemStartTime = 0,      -- Debut de cuisson de l'item actuel
+        cookTime = COOK_TIMES[fType] / 20,
+        type = fType,
+        lastCount = 0,          -- Pour detecter quand un item est cuit
+        timeRemaining = 0       -- Temps total restant pour le batch
+    }
 end
 
 -- ============================================
@@ -175,17 +193,7 @@ local function detectPeripherals()
                     name = name,
                     type = fType
                 })
-                furnaceData[name] = {
-                    item = "Vide",
-                    itemName = nil,
-                    count = 0,
-                    progress = 0,
-                    fuel = 0,
-                    cooking = false,
-                    startTime = 0,
-                    cookTime = COOK_TIMES[fType] / 20,
-                    type = fType
-                }
+                furnaceData[name] = initFurnaceData(name, fType)
             end
         end
     end
@@ -210,17 +218,7 @@ local function detectPeripherals()
             
             if fType then
                 table.insert(allFurnaces, { name = name, type = fType })
-                furnaceData[name] = {
-                    item = "Vide",
-                    itemName = nil,
-                    count = 0,
-                    progress = 0,
-                    fuel = 0,
-                    cooking = false,
-                    startTime = 0,
-                    cookTime = COOK_TIMES[fType] / 20,
-                    type = fType
-                }
+                furnaceData[name] = initFurnaceData(name, fType)
             end
         end
     end
@@ -237,7 +235,7 @@ end
 local function addAlert(id, message, level)
     alerts[id] = {
         message = message,
-        level = level or "warning", -- warning, error, info
+        level = level or "warning",
         time = os.clock()
     }
 end
@@ -305,46 +303,82 @@ local function getFurnaceStatus(furnaceName)
     local fuelItem = items[2]
     local outputItem = items[3]
     
-    local oldItem = data.itemName
-    local newItemName = inputItem and inputItem.name or nil
+    local currentCount = inputItem and inputItem.count or 0
+    local currentItemName = inputItem and inputItem.name or nil
     
-    -- Detecter nouveau item
-    if newItemName and newItemName ~= oldItem then
-        data.startTime = os.clock()
-        data.cooking = true
-        data.itemName = newItemName
+    -- Detecter un nouveau batch (nouveau type d'item ou premier item)
+    if currentItemName and currentItemName ~= data.itemName then
+        -- Nouveau type d'item = nouveau batch
+        data.itemName = currentItemName
         data.item = getItemName(inputItem)
-        data.count = inputItem.count
-    elseif not newItemName then
-        -- Item termine
-        if data.cooking and oldItem then
-            stats.sessionCooked = stats.sessionCooked + 1
-            stats.totalCooked = stats.totalCooked + 1
+        data.initialCount = currentCount
+        data.cookedCount = 0
+        data.lastCount = currentCount
+        data.itemStartTime = os.clock()
+        data.cooking = true
+    elseif currentItemName and currentCount > data.lastCount then
+        -- Des items ont ete ajoutes au batch existant
+        local added = currentCount - data.lastCount
+        data.initialCount = data.initialCount + added
+        data.lastCount = currentCount
+    elseif currentItemName and currentCount < data.lastCount then
+        -- Un item a ete cuit (count a diminue)
+        local cooked = data.lastCount - currentCount
+        data.cookedCount = data.cookedCount + cooked
+        data.lastCount = currentCount
+        data.itemStartTime = os.clock() -- Reset timer pour le prochain item
+        
+        -- Stats globales
+        stats.sessionCooked = stats.sessionCooked + cooked
+        stats.totalCooked = stats.totalCooked + cooked
+        for i = 1, cooked do
             table.insert(stats.lastHourItems, os.epoch("utc"))
+        end
+    elseif not currentItemName and data.cooking then
+        -- Le four est maintenant vide, batch termine
+        if data.lastCount > 0 then
+            -- Compter les derniers items cuits
+            stats.sessionCooked = stats.sessionCooked + data.lastCount
+            stats.totalCooked = stats.totalCooked + data.lastCount
+            for i = 1, data.lastCount do
+                table.insert(stats.lastHourItems, os.epoch("utc"))
+            end
         end
         data.cooking = false
         data.progress = 0
+        data.currentItemProgress = 0
         data.itemName = nil
         data.item = "Vide"
         data.count = 0
-    elseif inputItem then
-        data.count = inputItem.count
+        data.initialCount = 0
+        data.cookedCount = 0
+        data.lastCount = 0
+        data.timeRemaining = 0
     end
     
+    data.count = currentCount
     data.fuel = fuelItem and fuelItem.count or 0
     
-    -- Calculer progression et temps restant
-    if data.cooking then
-        local elapsed = os.clock() - data.startTime
-        local cookTime = data.cookTime
-        data.progress = math.min(100, math.floor((elapsed / cookTime) * 100))
-        data.timeRemaining = math.max(0, cookTime - elapsed)
+    -- Calculer progression et temps restant pour tout le batch
+    if data.cooking and data.initialCount > 0 then
+        -- Progression de l'item en cours (0-100%)
+        local elapsed = os.clock() - data.itemStartTime
+        data.currentItemProgress = math.min(100, (elapsed / data.cookTime) * 100)
         
-        -- Reset si item termine
-        if data.progress >= 100 then
-            data.startTime = os.clock()
-        end
+        -- Progression globale du batch
+        -- = (items cuits + progression item actuel) / total initial
+        local totalProgress = data.cookedCount + (data.currentItemProgress / 100)
+        data.progress = math.floor((totalProgress / data.initialCount) * 100)
+        data.progress = math.min(100, math.max(0, data.progress))
+        
+        -- Temps restant = temps pour items restants + temps restant item actuel
+        local itemTimeRemaining = math.max(0, data.cookTime - elapsed)
+        local remainingItems = currentCount - 1 -- -1 car l'item actuel est en cours
+        if remainingItems < 0 then remainingItems = 0 end
+        data.timeRemaining = itemTimeRemaining + (remainingItems * data.cookTime)
     else
+        data.progress = 0
+        data.currentItemProgress = 0
         data.timeRemaining = 0
     end
     
@@ -400,7 +434,6 @@ end
 
 local function getBestFurnace(itemName)
     if not config.smartRouting then
-        -- Sans routage intelligent, trouver n'importe quel four disponible
         for _, furnaceInfo in ipairs(allFurnaces) do
             local furnace = peripheral.wrap(furnaceInfo.name)
             if furnace then
@@ -676,7 +709,7 @@ local function updateMonitor()
             monitor.setTextColor(colors.white)
             monitor.write(tostring(i) .. " ")
             
-            -- Item en cours
+            -- Item en cours avec quantite initiale/restante
             if data.cooking then
                 monitor.setTextColor(colors.yellow)
             else
@@ -684,11 +717,12 @@ local function updateMonitor()
             end
             
             local itemDisplay = data.item
-            if data.count > 1 then
-                itemDisplay = itemDisplay .. " x" .. data.count
+            if data.cooking and data.initialCount > 0 then
+                -- Afficher: "Item (restant/total)"
+                itemDisplay = itemDisplay .. " " .. data.count .. "/" .. data.initialCount
             end
-            if #itemDisplay > 14 then
-                itemDisplay = itemDisplay:sub(1, 12) .. ".."
+            if #itemDisplay > 18 then
+                itemDisplay = itemDisplay:sub(1, 16) .. ".."
             end
             monitor.write(itemDisplay)
             
@@ -704,7 +738,7 @@ local function updateMonitor()
                 monitor.setCursorPos(12, yPos)
                 monitor.write(string.format("%3d%%", data.progress))
                 
-                -- Temps restant
+                -- Temps restant pour tout le batch
                 monitor.setTextColor(colors.lightGray)
                 monitor.setCursorPos(17, yPos)
                 monitor.write("~" .. formatTime(data.timeRemaining))
@@ -794,7 +828,6 @@ end
 local function touchLoop()
     while running do
         local event, side, x, y = os.pullEvent("monitor_touch")
-        -- Toggle pause sur touch
         paused = not paused
         log(paused and "PAUSE (touch)" or "REPRISE (touch)")
     end
