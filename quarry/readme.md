@@ -1,446 +1,345 @@
-# 🔨 QUARRY MINER
+# 🔨 TURTLE TOOLS
 
-Programme de minage automatique pour Mining Turtle (ComputerCraft / CC:Tweaked)
+Suite de programmes pour Mining Turtle (ComputerCraft / CC:Tweaked)
 
-Creuse automatiquement une zone rectangulaire entre deux coordonnées.
-
----
-
-## 📋 Fonctionnalités
-
-- **Minage par tranche** : Creuse de haut en bas, tranche par tranche
-- **GPS optionnel** : Fonctionne avec ou sans réseau GPS
-- **Dépôt automatique** : Retourne au coffre quand l'inventaire est plein
-- **Gestion du fuel** : Calcule le fuel nécessaire et se recharge automatiquement
-- **Reprise des chutes** : Gère le sable et gravier qui tombent
-- **⭐ Reprise automatique** : Sauvegarde la progression et reprend après un arrêt
+- **QUARRY** : Mine automatiquement une zone
+- **FILL** : Remplit une zone avec dirt ou cobblestone
+- **MONITOR** : Surveille les turtles depuis un Pocket Computer
 
 ---
 
 ## 📦 Installation
 
-### Option 1 : Installer automatique
+### Sur une Turtle
 
 ```
 wget run https://raw.githubusercontent.com/chausette/computerCraft/master/quarry/installer.lua
 ```
 
-### Option 2 : Téléchargement direct
+Installe automatiquement : `menu.lua`, `quarry.lua`, `fill.lua`
+
+### Sur un Pocket Computer
 
 ```
-wget https://raw.githubusercontent.com/chausette/computerCraft/master/quarry/quarry.lua
+wget run https://raw.githubusercontent.com/chausette/computerCraft/master/quarry/installer.lua
 ```
 
-### Option 3 : Pastebin
-
-```
-pastebin get [CODE] quarry.lua
-```
+Installe automatiquement : `monitor.lua`
 
 ---
 
-## 🚀 Utilisation
+## 🎮 Utilisation
 
-### Lancer le programme
+### Menu principal (Turtle)
+
+```
+menu
+```
+
+Affiche un menu pour choisir entre QUARRY et FILL.
+
+### Lancer directement un programme
 
 ```
 quarry
 ```
-
-### Étapes de configuration
-
-Le programme te guide avec des questions :
-
+ou
 ```
-1. Position actuelle de la turtle
-   → Automatique si GPS disponible
-   → Sinon, entre X, Y, Z manuellement (F3 dans Minecraft)
+fill
+```
 
-2. Direction actuelle
-   → 0 = Nord (-Z)
-   → 1 = Est (+X)
-   → 2 = Sud (+Z)
-   → 3 = Ouest (-X)
+---
 
-3. Coin 1 de la zone
-   → Coordonnées X, Y, Z du premier coin
+## ⛏️ QUARRY - Miner une zone
 
-4. Coin 2 de la zone
-   → Coordonnées X, Y, Z du coin opposé
+### Fonctionnalités
 
+- Mine une zone rectangulaire entre 2 coordonnées
+- Tranche par tranche (de haut en bas)
+- Dépôt automatique au coffre
+- Gestion du fuel
+- **Reprise automatique** après arrêt
+- **Monitoring wireless** sur Pocket
+
+### Configuration
+
+1. Position actuelle (GPS auto ou manuel)
+2. Direction (0=Nord, 1=Est, 2=Sud, 3=Ouest)
+3. Coin 1 de la zone (X, Y, Z)
+4. Coin 2 de la zone (X, Y, Z)
 5. Coffre fuel (optionnel)
-   → Si tu veux un coffre séparé pour le fuel
-```
 
-### Écran de confirmation
+### Préparation
 
-Avant de démarrer, le programme affiche :
-
-```
-Resume:
-  Zone: 10 x 20 x 15
-  Volume: 3000 blocs
-  De (100,40,200) a (109,59,214)
-
-Fuel:
-  Actuel: 5000
-  Estime necessaire: 4200
-  OK - Fuel suffisant
-
-Demarrer le minage? [O/n]:
-```
+- **Slot 16** : Fuel (charbon)
+- Place un **coffre SOUS** la turtle
 
 ---
 
-## ⚙️ Préparation avant le minage
+## 🧱 FILL - Remplir une zone
 
-### 1. Fuel
+### Fonctionnalités
 
-Mets du combustible dans le **slot 16** de la turtle :
-- Charbon
-- Charbon de bois
-- Blaze rod
-- Etc.
+- Remplit une zone avec **dirt** ou **cobblestone**
+- De bas en haut, tranche par tranche
+- Récupère les matériaux au coffre
+- Gestion du fuel
+- **Reprise automatique** après arrêt
+- **Monitoring wireless** sur Pocket
 
-Le slot 16 est réservé au fuel et ne sera pas vidé dans le coffre.
+### Configuration
 
-### 2. Coffre de dépôt
+1. Position actuelle (GPS auto ou manuel)
+2. Direction (0=Nord, 1=Est, 2=Sud, 3=Ouest)
+3. **Matériau** : Dirt ou Cobblestone
+4. Coin 1 de la zone (X, Y, Z)
+5. Coin 2 de la zone (X, Y, Z)
+6. Coffre matériaux (recommandé)
+7. Coffre fuel (optionnel)
 
-**Option A** : Place un coffre **SOUS** la turtle avant de lancer le programme
+### Préparation
 
-**Option B** : Mets un coffre dans l'inventaire de la turtle, elle le posera automatiquement
-
-### 3. Position de départ
-
-Place la turtle là où tu veux que soit le point de dépôt. C'est là qu'elle reviendra pour vider son inventaire.
-
-### 4. Coffre fuel (optionnel)
-
-Si tu configures un coffre fuel séparé :
-- Place un coffre aux coordonnées indiquées
-- Remplis-le de charbon
-- La turtle ira se recharger si elle manque de fuel
+- **Slots 1-15** : Matériaux (dirt ou cobblestone)
+- **Slot 16** : Fuel (charbon)
+- Place un **coffre** avec les matériaux
 
 ---
 
-## 📐 Comment définir la zone
+## 📱 MONITOR - Surveillance Pocket
 
-### Trouver les coordonnées
+### Fonctionnalités
 
-1. Appuie sur **F3** dans Minecraft
-2. Regarde la ligne "XYZ" pour ta position
-3. Note les coordonnées des deux coins opposés de la zone
+- Affiche en temps réel les infos des turtles
+- Fonctionne avec QUARRY et FILL
+- Plusieurs turtles supportées
+- Pas d'interaction, lecture seule
 
-### Exemple
-
-Tu veux miner une zone de 10x10 blocs, profonde de 20 blocs :
-
-```
-Coin 1 (surface, coin nord-ouest):
-  X: 100
-  Y: 64    ← niveau du sol
-  Z: 200
-
-Coin 2 (fond, coin sud-est):
-  X: 109   ← 100 + 9 = zone de 10 blocs
-  Y: 44    ← 64 - 20 = profondeur de 20 blocs
-  Z: 209   ← 200 + 9 = zone de 10 blocs
-```
-
-**Note** : L'ordre des coins n'a pas d'importance, le programme calcule automatiquement min/max.
-
----
-
-## 🔄 Méthode de minage
-
-Le programme utilise la méthode **tranche par tranche** :
+### Lancement
 
 ```
-Vue de dessus (une tranche Z) :
-
-    X →
-  ┌─────────┐
-Y │ ← ← ← ← │  Ligne 1 (haut)
-↓ │ → → → → │  Ligne 2
-  │ ← ← ← ← │  Ligne 3
-  │ → → → → │  Ligne 4 (bas)
-  └─────────┘
-
-Puis passe à la tranche Z suivante
+monitor
 ```
 
-### Avantages de cette méthode
-
-- Optimal pour les carrières
-- Gère bien le gravier/sable qui tombe
-- Mouvements efficaces (serpentin)
-
----
-
-## 📊 Pendant le minage
-
-L'écran affiche en temps réel :
+### Informations affichées
 
 ```
-=== QUARRY EN COURS ===
+================================
+   TURTLE MONITOR
+================================
 
-Position: 105, 52, 207
-Tranche: Z=207
-Progression: 45%
-Blocs mines: 1523
-Fuel: 3200
-Temps: 12:34
+Turtle_5              QUARRY
+------------------------------
+Status:  mining
+Progres: 45%
+████████████░░░░░░░░░░░░░░░░░░
+Blocs:   1523/3400
+Tranche: Z=207 (5/10)
+Pos:     105,52,207
+Dir:     Nord (-Z)
+Fuel:    3200
+Temps:   12:34
+ETA:     15:20
 
-Ctrl+T pour arreter
-(Reprise auto au relancement)
+Zone: 10x20x15
+------------------------------
+Q=Quit                      OK
 ```
 
-### Actions automatiques
+### Commandes
 
-| Situation | Action |
-|-----------|--------|
-| Inventaire plein | Retourne au coffre, dépose, revient |
-| Fuel bas | Utilise le slot 16 ou va au coffre fuel |
-| Gravier/sable | Attend et re-creuse jusqu'à ce que ce soit vide |
-| Obstacle | Creuse à travers |
+| Touche | Action |
+|--------|--------|
+| **Q** | Quitter |
+| **L** | Liste des turtles |
+| **S** | Vue single (une turtle) |
+| **R** | Rafraîchir |
 
----
+### Canal wireless
 
-## ⚠️ Arrêter le programme
+**Canal : 400**
 
-- **Ctrl + T** : Arrête proprement la turtle
-- La progression est **sauvegardée automatiquement**
-- Relance `quarry` pour reprendre là où tu t'es arrêté
+Les turtles envoient automatiquement leur status sur ce canal.
 
 ---
 
 ## 🔄 Reprise automatique
 
-### Comment ça marche
+Les programmes QUARRY et FILL sauvegardent leur progression.
 
-Le programme sauvegarde régulièrement sa progression dans un fichier `quarry_save.txt` :
-- Position actuelle de la turtle
-- Tranche en cours (Z)
-- Nombre de blocs minés
-- Configuration complète
+### Fichiers de sauvegarde
 
-### Quand tu relances `quarry`
+- `quarry_save.txt` : Progression du minage
+- `fill_save.txt` : Progression du remplissage
 
-Si une sauvegarde existe, tu verras :
+### Quand tu relances le programme
 
 ```
-================================
-   QUARRY MINER v2.0
-================================
-
 Sauvegarde trouvee!
 
 Zone: 10x20x15
 Derniere position: 105, 52, 207
 Tranche: Z=207 / 215
-Blocs deja mines: 1523
-Blocs restants: ~800
+Blocs mines: 1523
+Blocs restants: 1877
 
 Que voulez-vous faire?
-  1. Reprendre le minage
+  1. Reprendre
   2. Nouvelle configuration
   3. Annuler
 
 Choix [1]:
 ```
 
-### Options
-
-| Choix | Action |
-|-------|--------|
-| **1** | Reprend le minage là où il s'est arrêté |
-| **2** | Efface la sauvegarde et démarre une nouvelle config |
-| **3** | Quitte sans rien faire |
-
 ### Cas d'utilisation
 
-- **Serveur redémarre** : Relance `quarry` → Reprendre
-- **Chunk déchargé** : Relance `quarry` → Reprendre
-- **Ctrl+T accidentel** : Relance `quarry` → Reprendre
-- **Plus de fuel** : Ajoute du fuel, relance `quarry` → Reprendre
-- **Turtle cassée** : Replace la turtle au même endroit, relance `quarry` → Reprendre
+| Situation | Solution |
+|-----------|----------|
+| Serveur redémarre | Relance → Reprendre |
+| Chunk déchargé | Relance → Reprendre |
+| Ctrl+T | Relance → Reprendre |
+| Plus de fuel | Ajoute fuel → Reprendre |
 
-### Fichier de sauvegarde
+---
 
-Le fichier `quarry_save.txt` est automatiquement :
-- **Créé** au démarrage du minage
-- **Mis à jour** tous les 20 blocs
-- **Supprimé** quand le minage est terminé
+## 📡 Communication Wireless
+
+### Architecture
+
+```
+┌─────────────┐     Canal 400     ┌─────────────┐
+│   TURTLE    │ ═══════════════►  │   POCKET    │
+│  quarry.lua │    Status         │ monitor.lua │
+│   fill.lua  │    wireless       │             │
+└─────────────┘                   └─────────────┘
+```
+
+### Données transmises
+
+| Donnée | Description |
+|--------|-------------|
+| `program` | "quarry" ou "fill" |
+| `turtleId` | ID de la turtle |
+| `turtleName` | Nom de la turtle |
+| `x, y, z` | Position actuelle |
+| `facing` | Direction (0-3) |
+| `status` | mining, filling, idle, refuel... |
+| `progress` | Progression en % |
+| `blocksMined` | Blocs minés (quarry) |
+| `blocksPlaced` | Blocs placés (fill) |
+| `totalBlocks` | Total de blocs |
+| `currentSliceZ` | Tranche en cours |
+| `fuel` | Fuel actuel |
+| `elapsed` | Temps écoulé |
+| `eta` | Temps restant estimé |
+| `zone` | Dimensions de la zone |
+| `material` | Matériau (fill) |
+| `materialCount` | Matériaux restants (fill) |
 
 ---
 
 ## 🗂️ Slots de l'inventaire
 
+### QUARRY
+
 ```
 ┌────┬────┬────┬────┐
-│ 1  │ 2  │ 3  │ 4  │  ← Slots de minage
+│ 1  │ 2  │ 3  │ 4  │  ← Blocs minés
 ├────┼────┼────┼────┤
-│ 5  │ 6  │ 7  │ 8  │  ← Slots de minage
+│ 5  │ 6  │ 7  │ 8  │  ← Blocs minés
 ├────┼────┼────┼────┤
-│ 9  │ 10 │ 11 │ 12 │  ← Slots de minage
+│ 9  │ 10 │ 11 │ 12 │  ← Blocs minés
 ├────┼────┼────┼────┤
-│ 13 │ 14 │ 15 │ 16 │
-│    │    │Coff│Fuel│  ← 15: Coffre (optionnel)
-│    │    │ re │    │  ← 16: Fuel (réservé)
+│ 13 │ 14 │ -- │ 16 │  ← 16: Fuel
 └────┴────┴────┴────┘
 ```
 
-- **Slots 1-14** : Stockage des blocs minés
-- **Slot 15** : Coffre à poser (optionnel)
-- **Slot 16** : Fuel (charbon, etc.)
+### FILL
+
+```
+┌────┬────┬────┬────┐
+│ 1  │ 2  │ 3  │ 4  │  ← Matériaux
+├────┼────┼────┼────┤
+│ 5  │ 6  │ 7  │ 8  │  ← Matériaux
+├────┼────┼────┼────┤
+│ 9  │ 10 │ 11 │ 12 │  ← Matériaux
+├────┼────┼────┼────┤
+│ 13 │ 14 │ 15 │ 16 │  ← 16: Fuel
+└────┴────┴────┴────┘
+```
 
 ---
 
-## 🔧 Résolution de problèmes
+## ⚙️ Équipement requis
 
-### "Pas de fuel!"
+### Turtle
 
-- Mets du charbon dans le slot 16
-- Tape `refuel 16` pour recharger manuellement
+- **Mining Turtle** (avec pickaxe)
+- **Wireless Modem** (pour monitoring)
+- Fuel (charbon, charbon de bois...)
 
-### La turtle ne bouge pas
+### Pocket Computer
 
-- Vérifie qu'elle a du fuel : `print(turtle.getFuelLevel())`
-- Vérifie qu'elle n'est pas bloquée physiquement
-
-### GPS non disponible
-
-- Normal si tu n'as pas de réseau GPS
-- Le programme fonctionne en mode manuel
-- Tu dois juste entrer les coordonnées toi-même
-
-### "Fuel insuffisant"
-
-Le programme t'avertit si le fuel actuel est inférieur à l'estimation. Tu peux :
-- Ajouter du fuel dans le slot 16
-- Configurer un coffre fuel pour le rechargement auto
-- Lancer quand même (la turtle s'arrêtera si elle n'a plus de fuel)
-
-### L'inventaire se remplit trop vite
-
-- Vérifie que le coffre de dépôt est bien placé
-- Vérifie que la turtle peut accéder au coffre (pas de bloc devant)
-
----
-
-## 📈 Calcul du fuel
-
-Le programme estime le fuel nécessaire :
-
-```
-Fuel = Volume de la zone
-     + Trajets aller-retour au coffre
-     + Marge de sécurité (30%)
-```
-
-### Consommation de fuel
-
-| Action | Fuel |
-|--------|------|
-| Avancer/Reculer | 1 |
-| Monter/Descendre | 1 |
-| Tourner | 0 |
-| Creuser | 0 |
-
-### Exemple
-
-Zone de 10x10x20 = 2000 blocs
-- Déplacements dans la zone : ~2000
-- Retours au coffre (~30 trajets de 50 blocs) : ~3000
-- **Total estimé : ~6500 fuel**
-
-Un charbon = 80 fuel, donc ~82 charbons nécessaires.
+- **Pocket Computer**
+- **Wireless Modem** (intégré ou attaché)
 
 ---
 
 ## 💡 Conseils
 
-1. **Commence petit** : Teste d'abord sur une zone 5x5x5
+1. **Commence petit** : Teste sur une zone 5x5x5
 
-2. **Prévois large** : Mets plus de fuel que l'estimation
+2. **Nomme ta turtle** : `label set MaTurtle` pour l'identifier sur le monitor
 
-3. **Coffre assez grand** : Un double coffre peut contenir plus de blocs
+3. **Prévois du fuel** : L'estimation est affichée avant de commencer
 
-4. **Position sûre** : Place la turtle en surface, pas dans un trou
+4. **Coffre assez grand** : Double coffre recommandé
 
-5. **Éclaire la zone** : Si tu mines en surface, éclaire pour éviter les mobs
+5. **GPS optionnel** : Les programmes fonctionnent sans GPS (mode manuel)
 
----
-
-## 📝 Exemple complet
-
-```
-> quarry
-
-================================
-   QUARRY MINER v1.0
-================================
-
-Recherche GPS...
-GPS non disponible - Mode manuel
-
-Configuration manuelle:
-
-Position actuelle de la turtle:
-  (GPS non disponible)
-  X: 100
-  Y: 65
-  Z: 200
-
-Direction actuelle:
-  0=Nord(-Z) 1=Est(+X) 2=Sud(+Z) 3=Ouest(-X)
-  Direction: 0
-
-Coin 1 de la zone:
-  X: 105
-  Y: 60
-  Z: 205
-
-Coin 2 de la zone:
-  X: 115
-  Y: 40
-  Z: 215
-
-Configurer un coffre fuel? [o/N]: n
-
-Resume:
-  Zone: 11 x 21 x 11
-  Volume: 2541 blocs
-  De (105,40,205) a (115,60,215)
-
-Fuel:
-  Actuel: 5000
-  Estime necessaire: 3800
-  OK - Fuel suffisant
-
-Coffre depot:
-  Position: 100, 65, 200
-
-IMPORTANT:
-  - Place un coffre SOUS la turtle
-  - Fuel dans le slot 16
-
-Demarrer le minage? [O/n]: o
-
-Demarrage du minage...
-Verification du coffre de depot...
-
-=== QUARRY EN COURS ===
-Position: 107, 58, 206
-Blocs mines: 234
-Fuel: 4850
-Temps: 2:15
-```
+6. **Plusieurs turtles** : Le monitor supporte plusieurs turtles en même temps
 
 ---
 
-## 📜 Licence
+## 🔧 Dépannage
+
+### "Pas de fuel!"
+
+```
+refuel 16
+```
+ou mets du charbon dans le slot 16
+
+### "GPS non disponible"
+
+Normal si pas de réseau GPS. Entre les coordonnées manuellement (F3)
+
+### Le monitor n'affiche rien
+
+- Vérifie que le modem est wireless
+- Vérifie que la turtle a un modem wireless
+- Vérifie que la turtle est en cours de minage/remplissage
+
+### La turtle s'arrête
+
+- Plus de fuel → Ajoute du fuel et relance
+- Inventaire plein → Configure un coffre de dépôt
+- Plus de matériaux (fill) → Remplis le coffre matériaux
+
+---
+
+## 📜 Fichiers
+
+| Fichier | Description |
+|---------|-------------|
+| `installer.lua` | Installateur automatique |
+| `menu.lua` | Menu principal turtle |
+| `quarry.lua` | Programme de minage |
+| `fill.lua` | Programme de remplissage |
+| `monitor.lua` | Surveillance pocket |
+
+---
+
+## 📝 Licence
 
 Programme libre d'utilisation et de modification.
-
 Créé pour ComputerCraft / CC:Tweaked sur Minecraft.

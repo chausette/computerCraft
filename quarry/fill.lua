@@ -1,10 +1,10 @@
 -- ============================================
--- QUARRY.lua - Programme de minage de zone
+-- FILL.lua - Programme de remplissage de zone
 -- Version 2.0 - Avec reprise et monitoring
 -- ============================================
 
 local VERSION = "2.0"
-local SAVE_FILE = "quarry_save.txt"
+local SAVE_FILE = "fill_save.txt"
 local MONITOR_CHANNEL = 400
 
 -- ============================================
@@ -17,8 +17,9 @@ local config = {
     chestPos = nil,
     fuelChestPos = nil,
     fuelSlot = 16,
+    materialSlots = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+    material = "minecraft:dirt",  -- ou minecraft:cobblestone
     minFuel = 100,
-    minFreeSlots = 2,
 }
 
 -- ============================================
@@ -34,18 +35,17 @@ local state = {
     hasGPS = false,
     running = false,
     
-    -- Progression
     currentSliceZ = nil,
     currentY = nil,
     currentX = nil,
-    miningStarted = false,
+    fillStarted = false,
     
-    -- Zone calculee
     zone = nil,
     
-    -- Stats
-    blocksMined = 0,
+    blocksPlaced = 0,
+    totalBlocks = 0,
     startTime = 0,
+    status = "idle",
 }
 
 -- ============================================
@@ -84,22 +84,15 @@ local function sendStatus()
     if not modem then return end
     
     local progress = 0
-    if state.zone then
-        local totalSlices = state.zone.maxZ - state.zone.minZ + 1
-        local currentSlice = (state.currentSliceZ or state.zone.minZ) - state.zone.minZ
-        progress = math.floor((currentSlice / totalSlices) * 100)
-    end
-    
-    local totalBlocks = 0
-    if state.zone then
-        totalBlocks = state.zone.width * state.zone.height * state.zone.length
+    if state.totalBlocks > 0 then
+        progress = math.floor((state.blocksPlaced / state.totalBlocks) * 100)
     end
     
     local elapsed = os.clock() - state.startTime
     
     local data = {
         type = "status",
-        program = "quarry",
+        program = "fill",
         version = VERSION,
         turtleId = os.getComputerID(),
         turtleName = os.getComputerLabel() or ("Turtle_" .. os.getComputerID()),
@@ -112,9 +105,9 @@ local function sendStatus()
         facingName = dirNames[state.facing + 1],
         
         -- Progression
-        status = state.running and "mining" or "idle",
-        blocksMined = state.blocksMined,
-        totalBlocks = totalBlocks,
+        status = state.status,
+        blocksPlaced = state.blocksPlaced,
+        totalBlocks = state.totalBlocks,
         progress = progress,
         
         -- Tranche
@@ -130,6 +123,8 @@ local function sendStatus()
         -- Ressources
         fuel = turtle.getFuelLevel(),
         fuelMax = turtle.getFuelLimit(),
+        material = config.material,
+        materialCount = 0,  -- Mis à jour ci-dessous
         
         -- Temps
         elapsed = elapsed,
@@ -140,10 +135,17 @@ local function sendStatus()
         etaFormatted = "--:--",
     }
     
+    -- Compte les materiaux
+    local matCount = 0
+    for _, slot in ipairs(config.materialSlots) do
+        matCount = matCount + turtle.getItemCount(slot)
+    end
+    data.materialCount = matCount
+    
     -- Calcul ETA
-    if state.blocksMined > 0 and elapsed > 0 then
-        local blocksPerSec = state.blocksMined / elapsed
-        local remaining = totalBlocks - state.blocksMined
+    if state.blocksPlaced > 0 and elapsed > 0 then
+        local blocksPerSec = state.blocksPlaced / elapsed
+        local remaining = state.totalBlocks - state.blocksPlaced
         if blocksPerSec > 0 then
             data.eta = remaining / blocksPerSec
             data.etaFormatted = string.format("%d:%02d", 
@@ -170,8 +172,9 @@ local function saveState()
             currentSliceZ = state.currentSliceZ,
             currentY = state.currentY,
             currentX = state.currentX,
-            miningStarted = state.miningStarted,
-            blocksMined = state.blocksMined,
+            fillStarted = state.fillStarted,
+            blocksPlaced = state.blocksPlaced,
+            totalBlocks = state.totalBlocks,
             startTime = state.startTime,
             zone = state.zone,
         }
@@ -208,8 +211,9 @@ local function loadState()
                 state.currentSliceZ = data.state.currentSliceZ
                 state.currentY = data.state.currentY
                 state.currentX = data.state.currentX
-                state.miningStarted = data.state.miningStarted or false
-                state.blocksMined = data.state.blocksMined or 0
+                state.fillStarted = data.state.fillStarted or false
+                state.blocksPlaced = data.state.blocksPlaced or 0
+                state.totalBlocks = data.state.totalBlocks or 0
                 state.startTime = data.state.startTime or os.clock()
                 state.zone = data.state.zone
             end
@@ -245,7 +249,7 @@ local function printHeader()
     clear()
     color(colors.yellow)
     print("================================")
-    print("   QUARRY MINER v" .. VERSION)
+    print("   FILL v" .. VERSION)
     print("================================")
     color(colors.white)
     print("")
@@ -257,21 +261,19 @@ local function printStatus()
     local secs = math.floor(elapsed % 60)
     
     local progress = 0
-    if state.zone then
-        local totalSlices = state.zone.maxZ - state.zone.minZ + 1
-        local currentSlice = (state.currentSliceZ or state.zone.minZ) - state.zone.minZ
-        progress = math.floor((currentSlice / totalSlices) * 100)
+    if state.totalBlocks > 0 then
+        progress = math.floor((state.blocksPlaced / state.totalBlocks) * 100)
     end
     
     clear()
     color(colors.yellow)
-    print("=== QUARRY EN COURS ===")
+    print("=== FILL EN COURS ===")
     color(colors.white)
     print("")
     print(string.format("Position: %d, %d, %d", state.x, state.y, state.z))
     print(string.format("Tranche: Z=%d", state.currentSliceZ or 0))
-    print(string.format("Progression: %d%%", progress))
-    print(string.format("Blocs mines: %d", state.blocksMined))
+    print(string.format("Progression: %d%% (%d/%d)", 
+        progress, state.blocksPlaced, state.totalBlocks))
     print(string.format("Fuel: %d", turtle.getFuelLevel()))
     print(string.format("Temps: %d:%02d", mins, secs))
     print("")
@@ -315,15 +317,6 @@ local function forward()
     return false
 end
 
-local function back()
-    if turtle.back() then
-        local vec = dirVectors[state.facing]
-        updatePos(-vec.x, 0, -vec.z)
-        return true
-    end
-    return false
-end
-
 local function up()
     if turtle.up() then
         updatePos(0, 1, 0)
@@ -343,7 +336,6 @@ end
 local function digForward()
     while turtle.detect() do
         turtle.dig()
-        state.blocksMined = state.blocksMined + 1
         sleep(0.05)
     end
     return forward()
@@ -352,7 +344,6 @@ end
 local function digUp()
     while turtle.detectUp() do
         turtle.digUp()
-        state.blocksMined = state.blocksMined + 1
         sleep(0.05)
     end
     return up()
@@ -361,7 +352,6 @@ end
 local function digDown()
     if turtle.detectDown() then
         turtle.digDown()
-        state.blocksMined = state.blocksMined + 1
     end
     return down()
 end
@@ -370,39 +360,37 @@ end
 -- NAVIGATION
 -- ============================================
 
-local function goTo(targetX, targetY, targetZ, digBlocks)
-    digBlocks = digBlocks ~= false
-    
+local function goTo(targetX, targetY, targetZ)
     while state.y < targetY do
-        if digBlocks then digUp() else up() end
+        digUp()
     end
     
     if targetX > state.x then
         face(EAST)
         while state.x < targetX do
-            if digBlocks then digForward() else forward() end
+            digForward()
         end
     elseif targetX < state.x then
         face(WEST)
         while state.x > targetX do
-            if digBlocks then digForward() else forward() end
+            digForward()
         end
     end
     
     if targetZ > state.z then
         face(SOUTH)
         while state.z < targetZ do
-            if digBlocks then digForward() else forward() end
+            digForward()
         end
     elseif targetZ < state.z then
         face(NORTH)
         while state.z > targetZ do
-            if digBlocks then digForward() else forward() end
+            digForward()
         end
     end
     
     while state.y > targetY do
-        if digBlocks then digDown() else down() end
+        digDown()
     end
     
     return state.x == targetX and state.y == targetY and state.z == targetZ
@@ -456,14 +444,22 @@ end
 -- INVENTAIRE & FUEL
 -- ============================================
 
-local function getFreeSlots()
-    local free = 0
-    for slot = 1, 14 do
-        if turtle.getItemCount(slot) == 0 then
-            free = free + 1
+local function getMaterialCount()
+    local count = 0
+    for _, slot in ipairs(config.materialSlots) do
+        count = count + turtle.getItemCount(slot)
+    end
+    return count
+end
+
+local function selectMaterial()
+    for _, slot in ipairs(config.materialSlots) do
+        if turtle.getItemCount(slot) > 0 then
+            turtle.select(slot)
+            return true
         end
     end
-    return free
+    return false
 end
 
 local function refuel()
@@ -476,8 +472,11 @@ local function refuel()
     end
     
     if turtle.getFuelLevel() < config.minFuel and config.fuelChestPos then
+        state.status = "refuel"
+        sendStatus()
+        
         local returnX, returnY, returnZ = state.x, state.y, state.z
-        goTo(config.fuelChestPos.x, config.fuelChestPos.y, config.fuelChestPos.z, true)
+        goTo(config.fuelChestPos.x, config.fuelChestPos.y, config.fuelChestPos.z)
         
         turtle.select(config.fuelSlot)
         for i = 1, 4 do
@@ -488,53 +487,65 @@ local function refuel()
         turtle.suckDown(64)
         turtle.refuel()
         
-        goTo(returnX, returnY, returnZ, true)
+        goTo(returnX, returnY, returnZ)
+        state.status = "filling"
     end
     
     turtle.select(1)
     return turtle.getFuelLevel() >= config.minFuel
 end
 
-local function depositItems()
+local function getMaterialsFromChest()
     if not config.chestPos then return false end
+    
+    state.status = "materiaux"
+    sendStatus()
     
     local returnX, returnY, returnZ = state.x, state.y, state.z
     local returnFacing = state.facing
     
-    goTo(config.chestPos.x, config.chestPos.y, config.chestPos.z, true)
+    goTo(config.chestPos.x, config.chestPos.y, config.chestPos.z)
     
-    for slot = 1, 14 do
-        if turtle.getItemCount(slot) > 0 then
-            turtle.select(slot)
-            
-            if not turtle.dropDown() then
-                for i = 1, 4 do
-                    if turtle.drop() then break end
-                    turnRight()
-                end
+    -- Remplit tous les slots materiaux
+    for _, slot in ipairs(config.materialSlots) do
+        turtle.select(slot)
+        local count = turtle.getItemCount()
+        local needed = 64 - count
+        
+        if needed > 0 then
+            for i = 1, 4 do
+                if turtle.suck(needed) then break end
+                turtle.turnRight()
             end
+            turtle.suckUp(needed)
+            turtle.suckDown(needed)
         end
     end
     
     turtle.select(1)
-    goTo(returnX, returnY, returnZ, true)
+    goTo(returnX, returnY, returnZ)
     face(returnFacing)
     
-    return true
-end
-
-local function checkInventory()
-    if getFreeSlots() < config.minFreeSlots then
-        print("Inventaire plein, depot...")
-        depositItems()
-    end
+    state.status = "filling"
+    return getMaterialCount() > 0
 end
 
 local function checkFuel()
     if turtle.getFuelLevel() < config.minFuel then
-        print("Fuel bas, rechargement...")
         if not refuel() then
-            print("ATTENTION: Fuel insuffisant!")
+            return false
+        end
+    end
+    return true
+end
+
+local function checkMaterials()
+    if getMaterialCount() < 10 then
+        if config.chestPos then
+            getMaterialsFromChest()
+        end
+        
+        if getMaterialCount() == 0 then
             return false
         end
     end
@@ -560,7 +571,7 @@ local function calculateFuelNeeded(p1, p2, chestPos)
     local volume = width * height * length
     local fuel = volume
     
-    local trips = math.ceil(volume / (14 * 64))
+    local trips = math.ceil(volume / (15 * 64))
     if chestPos then
         local distToChest = math.abs(minX - chestPos.x) 
                          + math.abs(minY - chestPos.y) 
@@ -590,42 +601,69 @@ local function getZoneInfo(p1, p2)
 end
 
 -- ============================================
--- MINAGE
+-- REMPLISSAGE
 -- ============================================
 
-local function mineSlice(zone, sliceZ)
+local function placeBlock()
+    if not selectMaterial() then
+        return false
+    end
+    
+    -- Place en dessous
+    if turtle.placeDown() then
+        state.blocksPlaced = state.blocksPlaced + 1
+        return true
+    end
+    
+    -- Si deja un bloc, on considere comme place
+    if turtle.detectDown() then
+        return true
+    end
+    
+    return false
+end
+
+local function fillSlice(zone, sliceZ)
     state.currentSliceZ = sliceZ
     saveState()
-    sendStatus()
     
     local reverse = ((sliceZ - zone.minZ) % 2 == 1)
     
-    for y = zone.maxY, zone.minY, -1 do
+    -- Remplit de BAS en HAUT
+    for y = zone.minY, zone.maxY do
         state.currentY = y
         
         local startX = reverse and zone.maxX or zone.minX
         local endX = reverse and zone.minX or zone.maxX
         local stepX = reverse and -1 or 1
         
-        goTo(startX, y, sliceZ, true)
+        -- La turtle doit etre AU-DESSUS du bloc a placer
+        goTo(startX, y + 1, sliceZ)
         
         local x = startX
         while true do
             state.currentX = x
             
-            -- Sauvegarde reguliere
-            if state.blocksMined % 20 == 0 then
+            if state.blocksPlaced % 20 == 0 then
                 saveState()
                 sendStatus()
             end
             
-            if turtle.detectDown() then
-                turtle.digDown()
-                state.blocksMined = state.blocksMined + 1
+            -- Place le bloc en dessous
+            if not placeBlock() then
+                -- Plus de materiaux, va chercher
+                if not checkMaterials() then
+                    state.status = "no_materials"
+                    sendStatus()
+                    saveState()
+                    return false
+                end
+                placeBlock()
             end
             
-            checkInventory()
             if not checkFuel() then
+                state.status = "no_fuel"
+                sendStatus()
                 saveState()
                 return false
             end
@@ -644,7 +682,7 @@ local function mineSlice(zone, sliceZ)
         
         reverse = not reverse
         
-        if state.blocksMined % 50 == 0 then
+        if state.blocksPlaced % 50 == 0 then
             printStatus()
         end
     end
@@ -653,17 +691,19 @@ local function mineSlice(zone, sliceZ)
     return true
 end
 
-local function mineZone(resumeFromZ)
+local function fillZone(resumeFromZ)
     local zone = state.zone
     
     if not resumeFromZ then
         print(string.format("Zone: %dx%dx%d", zone.width, zone.height, zone.length))
-        print(string.format("Volume: %d blocs", zone.width * zone.height * zone.length))
+        state.totalBlocks = zone.width * zone.height * zone.length
+        print(string.format("Blocs a placer: %d", state.totalBlocks))
         print("")
     end
     
     state.running = true
-    state.miningStarted = true
+    state.fillStarted = true
+    state.status = "filling"
     
     if state.startTime == 0 then
         state.startTime = os.clock()
@@ -671,30 +711,33 @@ local function mineZone(resumeFromZ)
     
     local startZ = resumeFromZ or zone.minZ
     
+    sendStatus()
+    
     for z = startZ, zone.maxZ do
         if not state.running then break end
         
         print(string.format("Tranche Z=%d (%d/%d)", z, z - zone.minZ + 1, zone.length))
         
-        if not mineSlice(zone, z) then
-            print("Arret: probleme de fuel")
+        if not fillSlice(zone, z) then
+            print("Arret: ressources insuffisantes")
             saveState()
             break
         end
     end
     
     if state.currentSliceZ and state.currentSliceZ >= zone.maxZ then
-        -- Termine!
-        print("Retour au depot...")
-        goTo(config.chestPos.x, config.chestPos.y, config.chestPos.z, true)
-        depositItems()
+        print("Retour au point de depart...")
+        goTo(config.chestPos.x, config.chestPos.y, config.chestPos.z)
         
         deleteSave()
-        state.miningStarted = false
+        state.fillStarted = false
+        state.status = "done"
     else
+        state.status = "paused"
         saveState()
     end
     
+    sendStatus()
     state.running = false
 end
 
@@ -746,10 +789,31 @@ local function askYesNo(prompt, default)
     return input == "o" or input == "oui" or input == "y" or input == "yes"
 end
 
+local function chooseMaterial()
+    print("")
+    color(colors.cyan)
+    print("Materiau a utiliser:")
+    color(colors.white)
+    print("  1. Dirt (terre)")
+    print("  2. Cobblestone")
+    print("")
+    
+    io.write("Choix [1]: ")
+    local input = read()
+    
+    if input == "2" then
+        config.material = "minecraft:cobblestone"
+        return "Cobblestone"
+    else
+        config.material = "minecraft:dirt"
+        return "Dirt"
+    end
+end
+
 local function setupManual()
     printHeader()
     
-    print("Configuration manuelle:")
+    print("Configuration:")
     print("")
     
     color(colors.cyan)
@@ -777,6 +841,8 @@ local function setupManual()
     print("  0=Nord(-Z) 1=Est(+X) 2=Sud(+Z) 3=Ouest(-X)")
     state.facing = readNumber("  Direction", state.facing)
     
+    local materialName = chooseMaterial()
+    
     print("")
     color(colors.cyan)
     config.pos1 = readCoords("Coin 1 de la zone:")
@@ -788,6 +854,11 @@ local function setupManual()
     color(colors.white)
     
     config.chestPos = {x = state.x, y = state.y, z = state.z}
+    
+    print("")
+    if askYesNo("Configurer un coffre materiaux?", true) then
+        config.chestPos = readCoords("Position coffre materiaux:")
+    end
     
     print("")
     if askYesNo("Configurer un coffre fuel?", false) then
@@ -810,10 +881,8 @@ local function confirmStart()
     print("Resume:")
     color(colors.white)
     print(string.format("  Zone: %d x %d x %d", zone.width, zone.height, zone.length))
-    print(string.format("  Volume: %d blocs", volume))
-    print(string.format("  De (%d,%d,%d) a (%d,%d,%d)", 
-        zone.minX, zone.minY, zone.minZ,
-        zone.maxX, zone.maxY, zone.maxZ))
+    print(string.format("  Blocs a placer: %d", volume))
+    print(string.format("  Materiau: %s", config.material:gsub("minecraft:", "")))
     print("")
     
     color(colors.cyan)
@@ -824,7 +893,7 @@ local function confirmStart()
     
     if currentFuel < fuelNeeded then
         color(colors.orange)
-        print(string.format("  ATTENTION: Il manque ~%d fuel!", fuelNeeded - currentFuel))
+        print(string.format("  ATTENTION: Il manque ~%d!", fuelNeeded - currentFuel))
         color(colors.white)
     else
         color(colors.lime)
@@ -833,20 +902,28 @@ local function confirmStart()
     end
     
     print("")
+    local matCount = getMaterialCount()
     color(colors.cyan)
-    print("Coffre depot:")
+    print("Materiaux:")
     color(colors.white)
-    print(string.format("  Position: %d, %d, %d", config.chestPos.x, config.chestPos.y, config.chestPos.z))
-    print("")
+    print(string.format("  En inventaire: %d", matCount))
+    print(string.format("  Necessaires: %d", volume))
     
+    if matCount < volume and not config.chestPos then
+        color(colors.orange)
+        print("  ATTENTION: Pas assez + pas de coffre!")
+        color(colors.white)
+    end
+    
+    print("")
     color(colors.yellow)
     print("IMPORTANT:")
-    print("  - Place un coffre SOUS la turtle")
+    print("  - Mets le materiau slots 1-15")
     print("  - Fuel dans le slot 16")
     color(colors.white)
     print("")
     
-    return askYesNo("Demarrer le minage?", true)
+    return askYesNo("Demarrer le remplissage?", true)
 end
 
 local function confirmResume()
@@ -860,14 +937,15 @@ local function confirmResume()
     if state.zone then
         print(string.format("Zone: %dx%dx%d", 
             state.zone.width, state.zone.height, state.zone.length))
-        print(string.format("Derniere position: %d, %d, %d", state.x, state.y, state.z))
+        print(string.format("Materiau: %s", config.material:gsub("minecraft:", "")))
+        print(string.format("Position: %d, %d, %d", state.x, state.y, state.z))
         print(string.format("Tranche: Z=%d / %d", 
             state.currentSliceZ or state.zone.minZ, state.zone.maxZ))
-        print(string.format("Blocs deja mines: %d", state.blocksMined))
+        print(string.format("Blocs places: %d / %d", 
+            state.blocksPlaced, state.totalBlocks))
         
-        local remaining = (state.zone.maxZ - (state.currentSliceZ or state.zone.minZ) + 1) 
-                        * state.zone.width * state.zone.height
-        print(string.format("Blocs restants: ~%d", remaining))
+        local remaining = state.totalBlocks - state.blocksPlaced
+        print(string.format("Blocs restants: %d", remaining))
     end
     
     print("")
@@ -875,7 +953,7 @@ local function confirmResume()
     color(colors.cyan)
     print("Que voulez-vous faire?")
     color(colors.white)
-    print("  1. Reprendre le minage")
+    print("  1. Reprendre le remplissage")
     print("  2. Nouvelle configuration")
     print("  3. Annuler")
     print("")
@@ -896,23 +974,6 @@ end
 -- ============================================
 -- PROGRAMME PRINCIPAL
 -- ============================================
-
-local function placeChest()
-    print("Verification du coffre de depot...")
-    turtle.select(1)
-    if not turtle.detectDown() then
-        for slot = 1, 16 do
-            turtle.select(slot)
-            local item = turtle.getItemDetail()
-            if item and item.name:find("chest") then
-                print("Pose du coffre...")
-                turtle.placeDown()
-                break
-            end
-        end
-    end
-    turtle.select(1)
-end
 
 local function main()
     printHeader()
@@ -939,51 +1000,45 @@ local function main()
     -- Verifie si sauvegarde existe
     local hasSave = loadState()
     
-    if hasSave and state.miningStarted then
+    if hasSave and state.fillStarted then
         local choice = confirmResume()
         
         if choice == "resume" then
             printHeader()
             color(colors.lime)
-            print("Reprise du minage...")
+            print("Reprise du remplissage...")
             color(colors.white)
             print("")
             
-            -- Essaie le GPS pour mettre a jour la position
             if tryGPS() then
                 print("GPS: Position mise a jour")
-                print(string.format("  Position: %d, %d, %d", state.x, state.y, state.z))
                 if calibrateDirection() then
-                    print("  Direction: " .. dirNames[state.facing + 1])
+                    print("Direction: " .. dirNames[state.facing + 1])
                 end
-            else
-                print("GPS non disponible")
-                print("Utilisation position sauvegardee")
             end
             
             sleep(1)
-            mineZone(state.currentSliceZ)
+            fillZone(state.currentSliceZ)
             
             printHeader()
-            if not state.miningStarted then
+            if not state.fillStarted then
                 color(colors.lime)
-                print("MINAGE TERMINE!")
+                print("REMPLISSAGE TERMINE!")
             else
                 color(colors.orange)
-                print("MINAGE INTERROMPU")
+                print("REMPLISSAGE INTERROMPU")
                 print("")
-                print("Relancez 'quarry' pour reprendre")
+                print("Relancez 'fill' pour reprendre")
             end
             color(colors.white)
             print("")
-            print(string.format("Blocs mines: %d", state.blocksMined))
+            print(string.format("Blocs places: %d", state.blocksPlaced))
             return
             
         elseif choice == "cancel" then
             print("Annule.")
             return
         end
-        -- Si "new", continue avec nouvelle config
     end
     
     -- Nouvelle configuration
@@ -1017,41 +1072,35 @@ local function main()
         return
     end
     
-    -- Demarrage
     printHeader()
     color(colors.lime)
-    print("Demarrage du minage...")
+    print("Demarrage du remplissage...")
     color(colors.white)
     print("")
     
-    placeChest()
-    
-    -- Sauvegarde initiale
     state.startTime = os.clock()
+    state.totalBlocks = state.zone.width * state.zone.height * state.zone.length
     saveState()
     
     sleep(1)
-    mineZone()
+    fillZone()
     
-    -- Termine
     printHeader()
-    if not state.miningStarted then
+    if not state.fillStarted then
         color(colors.lime)
-        print("MINAGE TERMINE!")
+        print("REMPLISSAGE TERMINE!")
     else
         color(colors.orange)
-        print("MINAGE INTERROMPU")
+        print("REMPLISSAGE INTERROMPU")
         print("")
-        print("Relancez 'quarry' pour reprendre")
+        print("Relancez 'fill' pour reprendre")
     end
     color(colors.white)
     print("")
-    print(string.format("Blocs mines: %d", state.blocksMined))
+    print(string.format("Blocs places: %d", state.blocksPlaced))
     
     local elapsed = os.clock() - state.startTime
-    local mins = math.floor(elapsed / 60)
-    local secs = math.floor(elapsed % 60)
-    print(string.format("Temps: %d:%02d", mins, secs))
+    print(string.format("Temps: %d:%02d", math.floor(elapsed/60), math.floor(elapsed%60)))
 end
 
 main()
