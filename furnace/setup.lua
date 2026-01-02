@@ -568,10 +568,12 @@ end
 -- BOUCLE PRINCIPALE
 -- ============================================
 
+-- Recuperer les arguments au niveau global
+local tArgs = {...}
+
 local function main()
     -- Si lance avec argument "install", installer directement
-    local args = {...}
-    if args[1] == "install" or args[1] == "update" then
+    if tArgs[1] == "install" or tArgs[1] == "update" then
         install()
         return
     end
