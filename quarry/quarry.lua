@@ -1,28 +1,21 @@
 -- ============================================
 -- QUARRY.lua - Programme de minage de zone
--- Turtle creuse entre 2 coordonnees
+-- Version 2.0 - Avec reprise automatique
 -- ============================================
 
-local VERSION = "1.0"
+local VERSION = "2.0"
+local SAVE_FILE = "quarry_save.txt"
 
 -- ============================================
 -- CONFIGURATION
 -- ============================================
 
 local config = {
-    -- Coordonnees de la zone (definies par l'utilisateur)
-    pos1 = nil,  -- {x, y, z}
-    pos2 = nil,  -- {x, y, z}
-    
-    -- Position du coffre de depot (point de depart)
-    chestPos = nil,  -- {x, y, z}
-    fuelChestPos = nil, -- {x, y, z} optionnel
-    
-    -- Slots
+    pos1 = nil,
+    pos2 = nil,
+    chestPos = nil,
+    fuelChestPos = nil,
     fuelSlot = 16,
-    chestSlot = 15,  -- Pour poser le coffre
-    
-    -- Seuils
     minFuel = 100,
     minFreeSlots = 2,
 }
@@ -35,15 +28,23 @@ local state = {
     x = 0,
     y = 0,
     z = 0,
-    facing = 0,  -- 0=Nord(-Z), 1=Est(+X), 2=Sud(+Z), 3=Ouest(-X)
+    facing = 0,
     
     hasGPS = false,
     running = false,
     
+    -- Progression
+    currentSliceZ = nil,
+    currentY = nil,
+    currentX = nil,
+    miningStarted = false,
+    
+    -- Zone calculee
+    zone = nil,
+    
     -- Stats
     blocksMined = 0,
     startTime = 0,
-    fuelUsed = 0,
 }
 
 -- ============================================
@@ -53,11 +54,83 @@ local state = {
 local NORTH, EAST, SOUTH, WEST = 0, 1, 2, 3
 local dirNames = {"Nord (-Z)", "Est (+X)", "Sud (+Z)", "Ouest (-X)"}
 local dirVectors = {
-    [0] = {x = 0, z = -1},   -- Nord
-    [1] = {x = 1, z = 0},    -- Est
-    [2] = {x = 0, z = 1},    -- Sud
-    [3] = {x = -1, z = 0},   -- Ouest
+    [0] = {x = 0, z = -1},
+    [1] = {x = 1, z = 0},
+    [2] = {x = 0, z = 1},
+    [3] = {x = -1, z = 0},
 }
+
+-- ============================================
+-- SAUVEGARDE / CHARGEMENT
+-- ============================================
+
+local function saveState()
+    local data = {
+        version = VERSION,
+        config = config,
+        state = {
+            x = state.x,
+            y = state.y,
+            z = state.z,
+            facing = state.facing,
+            currentSliceZ = state.currentSliceZ,
+            currentY = state.currentY,
+            currentX = state.currentX,
+            miningStarted = state.miningStarted,
+            blocksMined = state.blocksMined,
+            startTime = state.startTime,
+            zone = state.zone,
+        }
+    }
+    
+    local file = fs.open(SAVE_FILE, "w")
+    if file then
+        file.write(textutils.serialize(data))
+        file.close()
+        return true
+    end
+    return false
+end
+
+local function loadState()
+    if not fs.exists(SAVE_FILE) then
+        return false
+    end
+    
+    local file = fs.open(SAVE_FILE, "r")
+    if file then
+        local content = file.readAll()
+        file.close()
+        
+        local data = textutils.unserialize(content)
+        if data then
+            config = data.config or config
+            
+            if data.state then
+                state.x = data.state.x or 0
+                state.y = data.state.y or 0
+                state.z = data.state.z or 0
+                state.facing = data.state.facing or 0
+                state.currentSliceZ = data.state.currentSliceZ
+                state.currentY = data.state.currentY
+                state.currentX = data.state.currentX
+                state.miningStarted = data.state.miningStarted or false
+                state.blocksMined = data.state.blocksMined or 0
+                state.startTime = data.state.startTime or os.clock()
+                state.zone = data.state.zone
+            end
+            
+            return true
+        end
+    end
+    return false
+end
+
+local function deleteSave()
+    if fs.exists(SAVE_FILE) then
+        fs.delete(SAVE_FILE)
+    end
+end
 
 -- ============================================
 -- AFFICHAGE
@@ -89,18 +162,28 @@ local function printStatus()
     local mins = math.floor(elapsed / 60)
     local secs = math.floor(elapsed % 60)
     
+    local progress = 0
+    if state.zone then
+        local totalSlices = state.zone.maxZ - state.zone.minZ + 1
+        local currentSlice = (state.currentSliceZ or state.zone.minZ) - state.zone.minZ
+        progress = math.floor((currentSlice / totalSlices) * 100)
+    end
+    
     clear()
     color(colors.yellow)
     print("=== QUARRY EN COURS ===")
     color(colors.white)
     print("")
     print(string.format("Position: %d, %d, %d", state.x, state.y, state.z))
+    print(string.format("Tranche: Z=%d", state.currentSliceZ or 0))
+    print(string.format("Progression: %d%%", progress))
     print(string.format("Blocs mines: %d", state.blocksMined))
     print(string.format("Fuel: %d", turtle.getFuelLevel()))
     print(string.format("Temps: %d:%02d", mins, secs))
     print("")
     color(colors.lightGray)
     print("Ctrl+T pour arreter")
+    print("(Reprise auto au relancement)")
 end
 
 -- ============================================
@@ -163,12 +246,11 @@ local function down()
     return false
 end
 
--- Creuse et avance
 local function digForward()
     while turtle.detect() do
         turtle.dig()
         state.blocksMined = state.blocksMined + 1
-        sleep(0.05)  -- Pour le gravier/sable
+        sleep(0.05)
     end
     return forward()
 end
@@ -197,12 +279,10 @@ end
 local function goTo(targetX, targetY, targetZ, digBlocks)
     digBlocks = digBlocks ~= false
     
-    -- Monte d'abord si necessaire (pour eviter les obstacles)
     while state.y < targetY do
         if digBlocks then digUp() else up() end
     end
     
-    -- Deplacement X
     if targetX > state.x then
         face(EAST)
         while state.x < targetX do
@@ -215,7 +295,6 @@ local function goTo(targetX, targetY, targetZ, digBlocks)
         end
     end
     
-    -- Deplacement Z
     if targetZ > state.z then
         face(SOUTH)
         while state.z < targetZ do
@@ -228,7 +307,6 @@ local function goTo(targetX, targetY, targetZ, digBlocks)
         end
     end
     
-    -- Descend si necessaire
     while state.y > targetY do
         if digBlocks then digDown() else down() end
     end
@@ -255,7 +333,6 @@ end
 local function calibrateDirection()
     local startX, startZ = state.x, state.z
     
-    -- Essaie d'avancer
     for attempt = 1, 4 do
         if turtle.forward() then
             if tryGPS() then
@@ -299,13 +376,11 @@ local function refuel()
     local needed = config.minFuel - turtle.getFuelLevel()
     if needed <= 0 then return true end
     
-    -- Essaie le slot fuel
     turtle.select(config.fuelSlot)
     if turtle.getItemCount() > 0 then
         turtle.refuel()
     end
     
-    -- Si toujours pas assez et coffre fuel configure
     if turtle.getFuelLevel() < config.minFuel and config.fuelChestPos then
         local returnX, returnY, returnZ = state.x, state.y, state.z
         goTo(config.fuelChestPos.x, config.fuelChestPos.y, config.fuelChestPos.z, true)
@@ -334,12 +409,10 @@ local function depositItems()
     
     goTo(config.chestPos.x, config.chestPos.y, config.chestPos.z, true)
     
-    -- Depose dans le coffre (essaie toutes les directions)
     for slot = 1, 14 do
         if turtle.getItemCount(slot) > 0 then
             turtle.select(slot)
             
-            -- Essaie de deposer
             if not turtle.dropDown() then
                 for i = 1, 4 do
                     if turtle.drop() then break end
@@ -391,11 +464,8 @@ local function calculateFuelNeeded(p1, p2, chestPos)
     local length = maxZ - minZ + 1
     
     local volume = width * height * length
-    
-    -- Deplacements dans la zone
     local fuel = volume
     
-    -- Retours au coffre (estimation: 1 retour tous les 14*64 blocs)
     local trips = math.ceil(volume / (14 * 64))
     if chestPos then
         local distToChest = math.abs(minX - chestPos.x) 
@@ -404,7 +474,6 @@ local function calculateFuelNeeded(p1, p2, chestPos)
         fuel = fuel + (trips * distToChest * 2)
     end
     
-    -- Marge de securite 30%
     return math.ceil(fuel * 1.3), volume
 end
 
@@ -427,37 +496,44 @@ local function getZoneInfo(p1, p2)
 end
 
 -- ============================================
--- MINAGE (TRANCHE PAR TRANCHE)
+-- MINAGE
 -- ============================================
 
 local function mineSlice(zone, sliceZ)
-    -- Mine une tranche X/Y a la position Z donnee
-    local reverse = false
+    state.currentSliceZ = sliceZ
+    saveState()
+    
+    local reverse = ((sliceZ - zone.minZ) % 2 == 1)
     
     for y = zone.maxY, zone.minY, -1 do
+        state.currentY = y
+        
         local startX = reverse and zone.maxX or zone.minX
         local endX = reverse and zone.minX or zone.maxX
         local stepX = reverse and -1 or 1
         
-        -- Va au debut de la ligne
         goTo(startX, y, sliceZ, true)
         
-        -- Mine la ligne
         local x = startX
         while true do
-            -- Creuse le bloc actuel (si pas deja fait par goTo)
+            state.currentX = x
+            
+            -- Sauvegarde reguliere
+            if state.blocksMined % 20 == 0 then
+                saveState()
+            end
+            
             if turtle.detectDown() then
                 turtle.digDown()
                 state.blocksMined = state.blocksMined + 1
             end
             
-            -- Verifie inventaire et fuel
             checkInventory()
             if not checkFuel() then
+                saveState()
                 return false
             end
             
-            -- Avance au prochain bloc
             if x == endX then break end
             
             if stepX > 0 then
@@ -472,42 +548,56 @@ local function mineSlice(zone, sliceZ)
         
         reverse = not reverse
         
-        -- Mise a jour status
         if state.blocksMined % 50 == 0 then
             printStatus()
         end
     end
     
+    saveState()
     return true
 end
 
-local function mineZone()
-    local zone = getZoneInfo(config.pos1, config.pos2)
+local function mineZone(resumeFromZ)
+    local zone = state.zone
     
-    print(string.format("Zone: %dx%dx%d", zone.width, zone.height, zone.length))
-    print(string.format("Volume: %d blocs", zone.width * zone.height * zone.length))
-    print("")
+    if not resumeFromZ then
+        print(string.format("Zone: %dx%dx%d", zone.width, zone.height, zone.length))
+        print(string.format("Volume: %d blocs", zone.width * zone.height * zone.length))
+        print("")
+    end
     
     state.running = true
-    state.startTime = os.clock()
-    state.blocksMined = 0
+    state.miningStarted = true
     
-    -- Mine tranche par tranche (de minZ a maxZ)
-    for z = zone.minZ, zone.maxZ do
+    if state.startTime == 0 then
+        state.startTime = os.clock()
+    end
+    
+    local startZ = resumeFromZ or zone.minZ
+    
+    for z = startZ, zone.maxZ do
         if not state.running then break end
         
         print(string.format("Tranche Z=%d (%d/%d)", z, z - zone.minZ + 1, zone.length))
         
         if not mineSlice(zone, z) then
             print("Arret: probleme de fuel")
+            saveState()
             break
         end
     end
     
-    -- Retour au coffre
-    print("Retour au depot...")
-    goTo(config.chestPos.x, config.chestPos.y, config.chestPos.z, true)
-    depositItems()
+    if state.currentSliceZ and state.currentSliceZ >= zone.maxZ then
+        -- Termine!
+        print("Retour au depot...")
+        goTo(config.chestPos.x, config.chestPos.y, config.chestPos.z, true)
+        depositItems()
+        
+        deleteSave()
+        state.miningStarted = false
+    else
+        saveState()
+    end
     
     state.running = false
 end
@@ -566,7 +656,6 @@ local function setupManual()
     print("Configuration manuelle:")
     print("")
     
-    -- Position actuelle
     color(colors.cyan)
     print("Position actuelle de la turtle:")
     color(colors.white)
@@ -585,7 +674,6 @@ local function setupManual()
         state.z = readNumber("  Z", 0)
     end
     
-    -- Direction
     print("")
     color(colors.cyan)
     print("Direction actuelle:")
@@ -593,32 +681,30 @@ local function setupManual()
     print("  0=Nord(-Z) 1=Est(+X) 2=Sud(+Z) 3=Ouest(-X)")
     state.facing = readNumber("  Direction", state.facing)
     
-    -- Coin 1 de la zone
     print("")
     color(colors.cyan)
     config.pos1 = readCoords("Coin 1 de la zone:")
     color(colors.white)
     
-    -- Coin 2 de la zone
     print("")
     color(colors.cyan)
     config.pos2 = readCoords("Coin 2 de la zone:")
     color(colors.white)
     
-    -- Coffre de depot = position actuelle
     config.chestPos = {x = state.x, y = state.y, z = state.z}
     
-    -- Coffre fuel optionnel
     print("")
     if askYesNo("Configurer un coffre fuel?", false) then
         config.fuelChestPos = readCoords("Position coffre fuel:")
     end
     
+    state.zone = getZoneInfo(config.pos1, config.pos2)
+    
     return true
 end
 
 local function confirmStart()
-    local zone = getZoneInfo(config.pos1, config.pos2)
+    local zone = state.zone
     local fuelNeeded, volume = calculateFuelNeeded(config.pos1, config.pos2, config.chestPos)
     local currentFuel = turtle.getFuelLevel()
     
@@ -667,9 +753,70 @@ local function confirmStart()
     return askYesNo("Demarrer le minage?", true)
 end
 
+local function confirmResume()
+    printHeader()
+    
+    color(colors.lime)
+    print("Sauvegarde trouvee!")
+    color(colors.white)
+    print("")
+    
+    if state.zone then
+        print(string.format("Zone: %dx%dx%d", 
+            state.zone.width, state.zone.height, state.zone.length))
+        print(string.format("Derniere position: %d, %d, %d", state.x, state.y, state.z))
+        print(string.format("Tranche: Z=%d / %d", 
+            state.currentSliceZ or state.zone.minZ, state.zone.maxZ))
+        print(string.format("Blocs deja mines: %d", state.blocksMined))
+        
+        local remaining = (state.zone.maxZ - (state.currentSliceZ or state.zone.minZ) + 1) 
+                        * state.zone.width * state.zone.height
+        print(string.format("Blocs restants: ~%d", remaining))
+    end
+    
+    print("")
+    
+    color(colors.cyan)
+    print("Que voulez-vous faire?")
+    color(colors.white)
+    print("  1. Reprendre le minage")
+    print("  2. Nouvelle configuration")
+    print("  3. Annuler")
+    print("")
+    
+    io.write("Choix [1]: ")
+    local input = read()
+    
+    if input == "2" then
+        deleteSave()
+        return "new"
+    elseif input == "3" then
+        return "cancel"
+    else
+        return "resume"
+    end
+end
+
 -- ============================================
 -- PROGRAMME PRINCIPAL
 -- ============================================
+
+local function placeChest()
+    print("Verification du coffre de depot...")
+    turtle.select(1)
+    if not turtle.detectDown() then
+        for slot = 1, 16 do
+            turtle.select(slot)
+            local item = turtle.getItemDetail()
+            if item and item.name:find("chest") then
+                print("Pose du coffre...")
+                turtle.placeDown()
+                break
+            end
+        end
+    end
+    turtle.select(1)
+end
 
 local function main()
     printHeader()
@@ -684,7 +831,57 @@ local function main()
         return
     end
     
-    -- Essaie le GPS
+    -- Verifie si sauvegarde existe
+    local hasSave = loadState()
+    
+    if hasSave and state.miningStarted then
+        local choice = confirmResume()
+        
+        if choice == "resume" then
+            printHeader()
+            color(colors.lime)
+            print("Reprise du minage...")
+            color(colors.white)
+            print("")
+            
+            -- Essaie le GPS pour mettre a jour la position
+            if tryGPS() then
+                print("GPS: Position mise a jour")
+                print(string.format("  Position: %d, %d, %d", state.x, state.y, state.z))
+                if calibrateDirection() then
+                    print("  Direction: " .. dirNames[state.facing + 1])
+                end
+            else
+                print("GPS non disponible")
+                print("Utilisation position sauvegardee")
+            end
+            
+            sleep(1)
+            mineZone(state.currentSliceZ)
+            
+            printHeader()
+            if not state.miningStarted then
+                color(colors.lime)
+                print("MINAGE TERMINE!")
+            else
+                color(colors.orange)
+                print("MINAGE INTERROMPU")
+                print("")
+                print("Relancez 'quarry' pour reprendre")
+            end
+            color(colors.white)
+            print("")
+            print(string.format("Blocs mines: %d", state.blocksMined))
+            return
+            
+        elseif choice == "cancel" then
+            print("Annule.")
+            return
+        end
+        -- Si "new", continue avec nouvelle config
+    end
+    
+    -- Nouvelle configuration
     print("Recherche GPS...")
     if tryGPS() then
         color(colors.lime)
@@ -706,12 +903,10 @@ local function main()
     
     print("")
     
-    -- Configuration
     if not setupManual() then
         return
     end
     
-    -- Confirmation
     if not confirmStart() then
         print("Annule.")
         return
@@ -724,36 +919,29 @@ local function main()
     color(colors.white)
     print("")
     
-    -- Verifie/pose le coffre
-    print("Verification du coffre de depot...")
-    turtle.select(1)
-    if not turtle.detectDown() then
-        -- Cherche un coffre dans l'inventaire
-        for slot = 1, 16 do
-            turtle.select(slot)
-            local item = turtle.getItemDetail()
-            if item and item.name:find("chest") then
-                print("Pose du coffre...")
-                turtle.placeDown()
-                break
-            end
-        end
-    end
-    turtle.select(1)
+    placeChest()
+    
+    -- Sauvegarde initiale
+    state.startTime = os.clock()
+    saveState()
     
     sleep(1)
-    
-    -- Lance le minage
     mineZone()
     
     -- Termine
     printHeader()
-    color(colors.lime)
-    print("MINAGE TERMINE!")
+    if not state.miningStarted then
+        color(colors.lime)
+        print("MINAGE TERMINE!")
+    else
+        color(colors.orange)
+        print("MINAGE INTERROMPU")
+        print("")
+        print("Relancez 'quarry' pour reprendre")
+    end
     color(colors.white)
     print("")
     print(string.format("Blocs mines: %d", state.blocksMined))
-    print(string.format("Fuel utilise: %d", state.fuelUsed))
     
     local elapsed = os.clock() - state.startTime
     local mins = math.floor(elapsed / 60)
@@ -761,5 +949,4 @@ local function main()
     print(string.format("Temps: %d:%02d", mins, secs))
 end
 
--- Lance le programme
 main()

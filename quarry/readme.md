@@ -13,6 +13,7 @@ Creuse automatiquement une zone rectangulaire entre deux coordonnées.
 - **Dépôt automatique** : Retourne au coffre quand l'inventaire est plein
 - **Gestion du fuel** : Calcule le fuel nécessaire et se recharge automatiquement
 - **Reprise des chutes** : Gère le sable et gravier qui tombent
+- **⭐ Reprise automatique** : Sauvegarde la progression et reprend après un arrêt
 
 ---
 
@@ -184,11 +185,14 @@ L'écran affiche en temps réel :
 === QUARRY EN COURS ===
 
 Position: 105, 52, 207
+Tranche: Z=207
+Progression: 45%
 Blocs mines: 1523
 Fuel: 3200
 Temps: 12:34
 
 Ctrl+T pour arreter
+(Reprise auto au relancement)
 ```
 
 ### Actions automatiques
@@ -205,8 +209,68 @@ Ctrl+T pour arreter
 ## ⚠️ Arrêter le programme
 
 - **Ctrl + T** : Arrête proprement la turtle
-- La turtle s'arrête où elle est
-- Relance `quarry` pour recommencer (nouvelle config)
+- La progression est **sauvegardée automatiquement**
+- Relance `quarry` pour reprendre là où tu t'es arrêté
+
+---
+
+## 🔄 Reprise automatique
+
+### Comment ça marche
+
+Le programme sauvegarde régulièrement sa progression dans un fichier `quarry_save.txt` :
+- Position actuelle de la turtle
+- Tranche en cours (Z)
+- Nombre de blocs minés
+- Configuration complète
+
+### Quand tu relances `quarry`
+
+Si une sauvegarde existe, tu verras :
+
+```
+================================
+   QUARRY MINER v2.0
+================================
+
+Sauvegarde trouvee!
+
+Zone: 10x20x15
+Derniere position: 105, 52, 207
+Tranche: Z=207 / 215
+Blocs deja mines: 1523
+Blocs restants: ~800
+
+Que voulez-vous faire?
+  1. Reprendre le minage
+  2. Nouvelle configuration
+  3. Annuler
+
+Choix [1]:
+```
+
+### Options
+
+| Choix | Action |
+|-------|--------|
+| **1** | Reprend le minage là où il s'est arrêté |
+| **2** | Efface la sauvegarde et démarre une nouvelle config |
+| **3** | Quitte sans rien faire |
+
+### Cas d'utilisation
+
+- **Serveur redémarre** : Relance `quarry` → Reprendre
+- **Chunk déchargé** : Relance `quarry` → Reprendre
+- **Ctrl+T accidentel** : Relance `quarry` → Reprendre
+- **Plus de fuel** : Ajoute du fuel, relance `quarry` → Reprendre
+- **Turtle cassée** : Replace la turtle au même endroit, relance `quarry` → Reprendre
+
+### Fichier de sauvegarde
+
+Le fichier `quarry_save.txt` est automatiquement :
+- **Créé** au démarrage du minage
+- **Mis à jour** tous les 20 blocs
+- **Supprimé** quand le minage est terminé
 
 ---
 
