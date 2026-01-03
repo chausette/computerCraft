@@ -4,7 +4,8 @@
 -- Version 1.21 NeoForge
 -- ============================================
 
-local utils = require("mobTower.lib.utils")
+-- Charger utils
+local utils = dofile("/mobTower/lib/utils.lua")
 
 local ui = {}
 
@@ -49,7 +50,7 @@ function ui.init(mon)
         width, height = monitor.getSize()
         monitor.setBackgroundColor(theme.bg)
         monitor.clear()
-        utils.log("UI initialisé: " .. width .. "x" .. height)
+        utils.log("UI initialise: " .. width .. "x" .. height)
     end
     return width, height
 end
@@ -96,7 +97,6 @@ function ui.writeCenter(y, text, fg, bg)
     ui.writeLine(x, y, text, fg, bg)
 end
 
--- Dessiner une ligne horizontale
 function ui.drawLine(y, char, fg)
     if not monitor then return end
     char = char or "-"
@@ -109,7 +109,6 @@ end
 -- COMPOSANTS D'INTERFACE
 -- ============================================
 
--- Barre de progression
 function ui.drawProgressBar(x, y, w, percent, fg, bg)
     if not monitor then return end
     fg = fg or theme.graphBar
@@ -125,16 +124,13 @@ function ui.drawProgressBar(x, y, w, percent, fg, bg)
     ui.setColors(theme.text, bg)
     ui.write(string.rep(" ", w - filled))
     
-    -- Reset background
     ui.setColors(theme.text, theme.bg)
 end
 
--- Graphique en barres ASCII
 function ui.drawBarGraph(x, y, w, h, data, maxValue)
     if not monitor then return end
     if not data or #data == 0 then return end
     
-    -- Trouver la valeur max si non fournie
     if not maxValue then
         maxValue = 1
         for _, v in ipairs(data) do
@@ -142,18 +138,15 @@ function ui.drawBarGraph(x, y, w, h, data, maxValue)
         end
     end
     
-    -- Largeur de chaque barre
     local barWidth = math.floor(w / #data)
     if barWidth < 1 then barWidth = 1 end
     
-    -- Dessiner les barres
     for i, value in ipairs(data) do
         local barHeight = math.floor((value / maxValue) * h)
         if barHeight > h then barHeight = h end
         
         local barX = x + (i - 1) * barWidth
         
-        -- Dessiner la barre de bas en haut
         for j = 0, h - 1 do
             ui.setCursor(barX, y + h - 1 - j)
             if j < barHeight then
@@ -175,23 +168,19 @@ end
 function ui.drawHeader(title, spawnOn, sessionTime)
     if not monitor then return end
     
-    -- Barre d'en-tête
     ui.setColors(theme.headerText, theme.header)
     ui.setCursor(1, 1)
     ui.write(string.rep(" ", width))
     
-    -- Titre
     ui.setCursor(2, 1)
     ui.write("# " .. title)
     
-    -- État spawn
     local spawnText = spawnOn and "[ON ]" or "[OFF]"
     local spawnColor = spawnOn and theme.success or theme.danger
     ui.setCursor(math.floor(width / 2) - 2, 1)
     ui.setColors(spawnColor, theme.header)
     ui.write(spawnText)
     
-    -- Temps session
     local timeText = "Session: " .. utils.formatTime(sessionTime)
     ui.setCursor(width - #timeText, 1)
     ui.setColors(theme.headerText, theme.header)
@@ -203,37 +192,30 @@ end
 function ui.drawStats(x, y, stats, playerPresent)
     if not monitor then return end
     
-    -- Titre section
     ui.writeLine(x, y, "STATISTIQUES", theme.accent)
     
-    -- Indicateur joueur
     local playerIcon = playerPresent and "*" or "."
     local playerColor = playerPresent and theme.success or theme.textDim
     ui.writeLine(x + 13, y, playerIcon, playerColor)
     
     y = y + 2
     
-    -- Tués session (estimation)
     ui.writeLine(x, y, "Mobs session:", theme.textDim)
     ui.writeLine(x + 14, y, "~" .. utils.formatNumber(stats.session.mobsKilled), theme.success)
     y = y + 1
     
-    -- Tués total
     ui.writeLine(x, y, "Mobs total:", theme.textDim)
     ui.writeLine(x + 14, y, "~" .. utils.formatNumber(stats.total.mobsKilled), theme.text)
     y = y + 2
     
-    -- Items session
     ui.writeLine(x, y, "Items session:", theme.textDim)
     ui.writeLine(x + 14, y, utils.formatNumber(stats.session.itemsCollected), theme.success)
     y = y + 1
     
-    -- Items total
     ui.writeLine(x, y, "Items total:", theme.textDim)
     ui.writeLine(x + 14, y, utils.formatNumber(stats.total.itemsCollected), theme.text)
     y = y + 2
     
-    -- Rares session
     ui.writeLine(x, y, "Rares:", theme.textDim)
     ui.writeLine(x + 14, y, utils.formatNumber(stats.session.raresFound), theme.rare)
 end
@@ -241,7 +223,6 @@ end
 function ui.drawGraph(x, y, w, h, hourlyData)
     if not monitor then return end
     
-    -- Titre
     ui.writeLine(x, y, "PRODUCTION /HEURE", theme.accent)
     y = y + 2
     
@@ -250,7 +231,6 @@ function ui.drawGraph(x, y, w, h, hourlyData)
         return
     end
     
-    -- Extraire les valeurs de mobs
     local values = {}
     local maxVal = 1
     for _, data in ipairs(hourlyData) do
@@ -258,14 +238,11 @@ function ui.drawGraph(x, y, w, h, hourlyData)
         if data.mobs > maxVal then maxVal = data.mobs end
     end
     
-    -- Afficher max
     ui.writeLine(x, y, "Max: ~" .. utils.formatNumber(maxVal) .. "/h", theme.textDim)
     y = y + 1
     
-    -- Dessiner le graphique
     ui.drawBarGraph(x, y, w, h - 3, values, maxVal)
     
-    -- Légende temps
     y = y + h - 2
     ui.writeLine(x, y, "-" .. #hourlyData .. "h", theme.textDim)
     ui.writeLine(x + w - 4, y, "now", theme.textDim)
@@ -274,11 +251,9 @@ end
 function ui.drawStorage(x, y, storageStatus)
     if not monitor then return end
     
-    -- Titre
     ui.writeLine(x, y, "STOCKAGE", theme.accent)
     y = y + 2
     
-    -- Barre globale
     local percent = storageStatus.total.percent
     local barColor = theme.graphBar
     if percent >= 90 then
@@ -291,7 +266,6 @@ function ui.drawStorage(x, y, storageStatus)
     ui.writeLine(x + 19, y, percent .. "%", theme.text)
     y = y + 2
     
-    -- Warnings
     local warningCount = 0
     for _, warning in ipairs(storageStatus.warnings) do
         if warningCount >= 2 then break end
@@ -313,7 +287,6 @@ end
 function ui.drawRareItems(x, y, rareItems)
     if not monitor then return end
     
-    -- Titre avec étoile
     ui.writeLine(x, y, "* ITEMS RARES", theme.rare)
     y = y + 2
     
@@ -356,37 +329,24 @@ function ui.drawMainScreen(data)
     
     ui.clear()
     
-    -- En-tête
     ui.drawHeader("MOB TOWER v1.1", data.spawnOn, data.sessionTime)
-    
-    -- Ligne de séparation
     ui.drawLine(2)
     
-    -- Calculer les positions
     local leftCol = 2
     local rightCol = math.floor(width / 2) + 2
     local colWidth = math.floor(width / 2) - 3
     
-    -- Stats (colonne gauche, haut)
     ui.drawStats(leftCol, 4, data.stats, data.playerPresent)
-    
-    -- Graphique (colonne droite, haut)
     ui.drawGraph(rightCol, 4, colWidth, 8, data.hourlyData)
     
-    -- Ligne de séparation
     local midLine = 13
     ui.drawLine(midLine)
     
-    -- Stockage (colonne gauche, bas)
     ui.drawStorage(leftCol, midLine + 2, data.storageStatus)
-    
-    -- Items rares (colonne droite, bas)
     ui.drawRareItems(rightCol, midLine + 2, data.rareItems)
     
-    -- Footer
     ui.drawFooter(height - 1)
     
-    -- Alerte si active
     if alertState.active then
         ui.drawAlert()
     end
@@ -423,21 +383,18 @@ function ui.drawAlert()
     local x = math.floor((width - msgWidth) / 2)
     local y = math.floor(height / 2)
     
-    -- Flash effect (alternance de couleurs)
     local elapsed = (os.epoch("utc") / 1000) - alertState.startTime
     local flash = math.floor(elapsed * 4) % 2 == 0
     
     local bgColor = flash and theme.rare or theme.danger
     local fgColor = theme.bg
     
-    -- Dessiner le fond
     ui.setColors(fgColor, bgColor)
     for dy = -1, 1 do
         ui.setCursor(x, y + dy)
         ui.write(string.rep(" ", msgWidth))
     end
     
-    -- Message
     ui.setCursor(x + 2, y)
     ui.write(msg)
     
@@ -446,54 +403,6 @@ end
 
 function ui.isAlertActive()
     return alertState.active
-end
-
--- ============================================
--- ÉCRANS SECONDAIRES
--- ============================================
-
--- Menu de sélection
-function ui.drawMenu(title, options, selected)
-    if not monitor then return end
-    
-    ui.clear()
-    ui.drawHeader(title, nil, 0)
-    ui.drawLine(2)
-    
-    local y = 4
-    for i, option in ipairs(options) do
-        local prefix = (i == selected) and "> " or "  "
-        local color = (i == selected) and theme.accent or theme.text
-        ui.writeLine(4, y, prefix .. option, color)
-        y = y + 1
-    end
-    
-    ui.drawLine(height - 2)
-    ui.writeLine(2, height - 1, "[Fleches] Naviguer  [Entree] Selectionner", theme.textDim)
-end
-
--- Écran de confirmation
-function ui.drawConfirm(title, message)
-    if not monitor then return end
-    
-    ui.clear()
-    ui.drawHeader(title, nil, 0)
-    
-    ui.writeCenter(math.floor(height / 2) - 1, message, theme.warning)
-    ui.writeCenter(math.floor(height / 2) + 1, "[O] Oui  [N] Non", theme.accent)
-end
-
--- Message simple
-function ui.showMessage(title, message, duration)
-    if not monitor then return end
-    
-    ui.clear()
-    ui.drawHeader(title, nil, 0)
-    ui.writeCenter(math.floor(height / 2), message, theme.text)
-    
-    if duration then
-        sleep(duration)
-    end
 end
 
 return ui

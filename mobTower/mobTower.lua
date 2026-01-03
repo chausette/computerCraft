@@ -1,21 +1,19 @@
 -- ============================================
--- MOB TOWER MANAGER v1.0
+-- MOB TOWER MANAGER v1.1
 -- Programme principal
+-- Version 1.21 NeoForge
 -- Par MikeChausette
 -- ============================================
 
 -- Chemins
-local BASE_PATH = "mobTower"
-local CONFIG_PATH = BASE_PATH .. "/config.lua"
-local DATA_PATH = BASE_PATH .. "/data"
+local CONFIG_FILE = "/mobTower/config.lua"
+local CONFIG_DATA = "/mobTower/data/config.dat"
 
--- Charger les modules
-package.path = package.path .. ";/" .. BASE_PATH .. "/lib/?.lua"
-
-local utils = require("mobTower.lib.utils")
-local peripherals = require("mobTower.lib.peripherals")
-local storage = require("mobTower.lib.storage")
-local ui = require("mobTower.lib.ui")
+-- Charger les modules avec dofile
+local utils = dofile("/mobTower/lib/utils.lua")
+local peripherals = dofile("/mobTower/lib/peripherals.lua")
+local storage = dofile("/mobTower/lib/storage.lua")
+local ui = dofile("/mobTower/lib/ui.lua")
 
 -- Variables globales
 local config = nil
@@ -33,102 +31,73 @@ local function setupWizard()
     term.setCursorPos(1, 1)
     
     print("============================================")
-    print("   MOB TOWER MANAGER - Setup Wizard")
+    print("   MOB TOWER MANAGER v1.1 - Setup Wizard")
+    print("   Version 1.21 NeoForge")
     print("============================================")
     print("")
     
     -- Charger la config par défaut
-    config = dofile(CONFIG_PATH)
+    config = dofile(CONFIG_FILE)
     
-    -- Etape 1: Scan des périphériques
-    print("[1/8] Scan des peripheriques...")
+    -- Etape 1: Nom du joueur
+    print("[1/7] Quel est ton pseudo Minecraft?")
+    write("  Pseudo: ")
+    local playerName = read()
+    if playerName and #playerName > 0 then
+        config.player.name = playerName
+    end
+    print("  -> " .. config.player.name)
+    
+    -- Etape 2: Scan des périphériques
+    print("")
+    print("[2/7] Scan des peripheriques...")
     sleep(0.5)
     local allPeripherals = peripherals.listAll()
     
-    -- Etape 2: Entity Sensor Haut
+    -- Etape 3: Player Detector
     print("")
-    print("[2/8] Entity Sensor HAUT (darkroom)")
-    if #allPeripherals.entitySensors == 0 then
-        print("  /!\\ Aucun Entity Sensor trouve!")
-        print("  Verifiez vos connexions et relancez.")
-        return false
-    end
-    
-    for i, sensor in ipairs(allPeripherals.entitySensors) do
-        print("  " .. i .. ". " .. sensor.name)
-    end
-    write("  Choix (1-" .. #allPeripherals.entitySensors .. "): ")
-    local choice = tonumber(read())
-    if choice and allPeripherals.entitySensors[choice] then
-        config.peripherals.entitySensorTop = allPeripherals.entitySensors[choice].name
-        print("  -> " .. config.peripherals.entitySensorTop)
-    end
-    
-    -- Etape 3: Entity Sensor Bas
-    print("")
-    print("[3/8] Entity Sensor BAS (zone kill)")
-    local remainingSensors = {}
-    for i, sensor in ipairs(allPeripherals.entitySensors) do
-        if sensor.name ~= config.peripherals.entitySensorTop then
-            table.insert(remainingSensors, sensor)
+    print("[3/7] Player Detector (Advanced Peripherals)")
+    if #allPeripherals.playerDetectors == 0 then
+        print("  /!\\ Aucun Player Detector trouve!")
+        print("  Continuer sans? (o/n)")
+        local answer = read()
+        if answer:lower() ~= "o" then
+            return false
+        end
+    else
+        for i, detector in ipairs(allPeripherals.playerDetectors) do
+            print("  " .. i .. ". " .. detector.name)
+        end
+        write("  Choix (1-" .. #allPeripherals.playerDetectors .. "): ")
+        local choice = tonumber(read())
+        if choice and allPeripherals.playerDetectors[choice] then
+            config.peripherals.playerDetector = allPeripherals.playerDetectors[choice].name
+            print("  -> " .. config.peripherals.playerDetector)
         end
     end
     
-    if #remainingSensors == 0 then
-        print("  /!\\ Plus de sensors disponibles!")
-        print("  Vous avez besoin de 2 Entity Sensors.")
+    -- Etape 4: Moniteur
+    print("")
+    print("[4/7] Moniteur")
+    if #allPeripherals.monitors == 0 then
+        print("  /!\\ Aucun moniteur trouve!")
         return false
     end
     
-    for i, sensor in ipairs(remainingSensors) do
-        print("  " .. i .. ". " .. sensor.name)
+    for i, mon in ipairs(allPeripherals.monitors) do
+        print("  " .. i .. ". " .. mon.name)
     end
-    write("  Choix (1-" .. #remainingSensors .. "): ")
-    choice = tonumber(read())
-    if choice and remainingSensors[choice] then
-        config.peripherals.entitySensorBottom = remainingSensors[choice].name
-        print("  -> " .. config.peripherals.entitySensorBottom)
+    write("  Choix (1-" .. #allPeripherals.monitors .. "): ")
+    local choice = tonumber(read())
+    if choice and allPeripherals.monitors[choice] then
+        config.peripherals.monitor = allPeripherals.monitors[choice].name
+        print("  -> " .. config.peripherals.monitor)
     end
     
-    -- Etape 4: Inventory Manager
+    -- Etape 5: Configuration Redstone
     print("")
-    print("[4/8] Inventory Manager")
-    if #allPeripherals.inventoryManagers == 0 then
-        print("  /!\\ Aucun Inventory Manager trouve!")
-        return false
-    end
-    
-    for i, inv in ipairs(allPeripherals.inventoryManagers) do
-        print("  " .. i .. ". " .. inv.name)
-    end
-    write("  Choix (1-" .. #allPeripherals.inventoryManagers .. "): ")
-    choice = tonumber(read())
-    if choice and allPeripherals.inventoryManagers[choice] then
-        config.peripherals.inventoryManager = allPeripherals.inventoryManagers[choice].name
-        print("  -> " .. config.peripherals.inventoryManager)
-    end
-    
-    -- Etape 5: Redstone Integrator
-    print("")
-    print("[5/8] Redstone Integrator")
-    if #allPeripherals.redstoneIntegrators == 0 then
-        print("  /!\\ Aucun Redstone Integrator trouve!")
-        return false
-    end
-    
-    for i, rs in ipairs(allPeripherals.redstoneIntegrators) do
-        print("  " .. i .. ". " .. rs.name)
-    end
-    write("  Choix (1-" .. #allPeripherals.redstoneIntegrators .. "): ")
-    choice = tonumber(read())
-    if choice and allPeripherals.redstoneIntegrators[choice] then
-        config.peripherals.redstoneIntegrator = allPeripherals.redstoneIntegrators[choice].name
-        print("  -> " .. config.peripherals.redstoneIntegrator)
-    end
-    
-    -- Configuration Bundled Cable
-    print("")
-    print("  Cote du bundled cable:")
+    print("[5/7] Configuration Redstone (lampes)")
+    print("  Quel cote du computer pour les lampes?")
     local sides = {"top", "bottom", "left", "right", "front", "back"}
     for i, side in ipairs(sides) do
         print("    " .. i .. ". " .. side)
@@ -141,45 +110,22 @@ local function setupWizard()
     end
     
     print("")
-    print("  Couleur du cable:")
-    for i, color in ipairs(utils.COLOR_NAMES) do
-        print("    " .. i .. ". " .. color)
-    end
-    write("  Choix (1-16): ")
-    choice = tonumber(read())
-    if choice and utils.COLOR_NAMES[choice] then
-        config.redstone.color = utils.COLOR_NAMES[choice]
-        print("  -> " .. config.redstone.color)
-    end
+    print("  Inverser le signal? (o/n)")
+    local answer = read()
+    config.redstone.inverted = (answer:lower() == "o")
+    print("  -> Inversion: " .. tostring(config.redstone.inverted))
     
-    -- Etape 6: Moniteur
+    -- Etape 6: Coffre collecteur
     print("")
-    print("[6/8] Moniteur")
-    if #allPeripherals.monitors == 0 then
-        print("  /!\\ Aucun moniteur trouve!")
-        return false
-    end
-    
-    for i, mon in ipairs(allPeripherals.monitors) do
-        print("  " .. i .. ". " .. mon.name)
-    end
-    write("  Choix (1-" .. #allPeripherals.monitors .. "): ")
-    choice = tonumber(read())
-    if choice and allPeripherals.monitors[choice] then
-        config.peripherals.monitor = allPeripherals.monitors[choice].name
-        print("  -> " .. config.peripherals.monitor)
-    end
-    
-    -- Etape 7: Coffre collecteur
-    print("")
-    print("[7/8] Coffre collecteur")
+    print("[6/7] Coffre collecteur")
     if #allPeripherals.inventories == 0 then
         print("  /!\\ Aucun inventaire trouve!")
+        print("  Connectez vos coffres avec des wired modems.")
         return false
     end
     
     for i, inv in ipairs(allPeripherals.inventories) do
-        print("  " .. i .. ". " .. inv.name .. " (" .. inv.type .. ")")
+        print("  " .. i .. ". " .. inv.name .. " (" .. inv.size .. " slots)")
     end
     write("  Choix (1-" .. #allPeripherals.inventories .. "): ")
     choice = tonumber(read())
@@ -188,10 +134,11 @@ local function setupWizard()
         print("  -> " .. config.storage.collectorChest)
     end
     
-    -- Etape 8: Attribution des barils
+    -- Etape 7: Attribution des barils
     print("")
-    print("[8/8] Attribution des barils")
+    print("[7/7] Attribution des barils")
     print("Pour chaque item, selectionnez un baril.")
+    print("Appuyez sur Entree pour passer un item.")
     print("")
     
     local remainingInv = {}
@@ -211,11 +158,16 @@ local function setupWizard()
         
         print("")
         print("  Item: " .. item.name)
-        print("  Barils disponibles:")
+        print("  Barils: " .. #remainingInv)
         for i, inv in ipairs(remainingInv) do
-            print("    " .. i .. ". " .. inv.name)
+            if i <= 5 then
+                print("    " .. i .. ". " .. inv.name)
+            end
         end
-        print("    0. Passer (ne pas trier cet item)")
+        if #remainingInv > 5 then
+            print("    ... et " .. (#remainingInv - 5) .. " autres")
+        end
+        print("    0. Passer")
         
         write("  Choix: ")
         choice = tonumber(read())
@@ -239,9 +191,17 @@ local function setupWizard()
     print("Sauvegarde de la configuration...")
     
     config.setupComplete = true
-    utils.saveTable(CONFIG_PATH, config)
+    utils.ensureDir("/mobTower/data")
+    utils.saveTable(CONFIG_DATA, config)
     
     print("Configuration terminee!")
+    print("")
+    print("Materiel configure:")
+    print("  - Player Detector: " .. (config.peripherals.playerDetector or "Non"))
+    print("  - Moniteur: " .. (config.peripherals.monitor or "Non"))
+    print("  - Redstone: " .. config.redstone.side)
+    print("  - Coffre collecteur: " .. (config.storage.collectorChest or "Non"))
+    print("  - Regles de tri: " .. #config.storage.sortingRules)
     print("")
     print("Appuyez sur une touche pour demarrer...")
     os.pullEvent("key")
@@ -254,28 +214,29 @@ end
 -- ============================================
 
 local function loadConfig()
-    if fs.exists(CONFIG_PATH) then
-        local loaded = utils.loadTable(CONFIG_PATH)
-        if loaded then
+    -- Essayer de charger la config sauvegardée
+    if fs.exists(CONFIG_DATA) then
+        local loaded = utils.loadTable(CONFIG_DATA)
+        if loaded and loaded.setupComplete then
             config = loaded
             return true
         end
     end
     
     -- Charger la config par défaut
-    config = dofile(CONFIG_PATH)
+    config = dofile(CONFIG_FILE)
     return false
 end
 
 local function initialize()
-    utils.log("=== Démarrage Mob Tower Manager ===")
+    utils.log("=== Demarrage Mob Tower Manager v1.1 ===")
     
     -- Créer le dossier data
-    utils.ensureDir(DATA_PATH)
+    utils.ensureDir("/mobTower/data")
     
     -- Charger la config
     if not loadConfig() or not config.setupComplete then
-        utils.log("Premier lancement, démarrage du wizard")
+        utils.log("Premier lancement, demarrage du wizard")
         if not setupWizard() then
             return false
         end
@@ -301,14 +262,13 @@ local function initialize()
     
     -- État initial du spawn
     spawnOn = config.initialState.spawnOn
-    local colorValue = utils.COLORS[config.redstone.color] or colors.white
     if spawnOn then
-        peripherals.setSpawnOn(config.redstone.side, colorValue)
+        peripherals.setSpawnOn()
     else
-        peripherals.setSpawnOff(config.redstone.side, colorValue)
+        peripherals.setSpawnOff()
     end
     
-    utils.log("Initialisation terminée")
+    utils.log("Initialisation terminee")
     return true
 end
 
@@ -319,15 +279,11 @@ end
 local function updateDisplay()
     local stats = storage.getStats()
     
-    -- Compter les mobs
-    local mobsBottom = peripherals.getMobsBottom()
-    local mobsWaiting = #mobsBottom
-    
-    -- Mettre à jour le compteur de kills
-    storage.updateMobCount(mobsWaiting)
-    
     -- Vérifier présence joueur
-    local playerPresent = peripherals.isPlayerPresent(config.player.name)
+    local playerPresent = false
+    if config.peripherals.playerDetector then
+        playerPresent = peripherals.isPlayerPresent(config.player.name, config.player.detectionRange)
+    end
     
     -- Données pour l'affichage
     local displayData = {
@@ -335,7 +291,6 @@ local function updateDisplay()
         sessionTime = storage.getSessionTime(),
         playerPresent = playerPresent,
         stats = {
-            mobsWaiting = mobsWaiting,
             session = stats.session,
             total = stats.total
         },
@@ -352,24 +307,16 @@ local function processInput()
     local event, key = os.pullEvent("key")
     
     if key == keys.q then
-        -- Quitter
         running = false
         
     elseif key == keys.s then
-        -- Toggle spawn
-        local colorValue = utils.COLORS[config.redstone.color] or colors.white
-        local success, newState = peripherals.toggleSpawn(
-            config.redstone.side,
-            colorValue,
-            spawnOn
-        )
+        local success, newState = peripherals.toggleSpawn(spawnOn)
         if success then
             spawnOn = newState
             utils.log("Spawn toggle: " .. tostring(spawnOn))
         end
         
     elseif key == keys.r then
-        -- Reset stats (avec confirmation sur terminal)
         term.clear()
         term.setCursorPos(1, 1)
         print("Reset des statistiques de session?")
@@ -387,7 +334,6 @@ local function processInput()
         end
         
     elseif key == keys.c then
-        -- Config (relancer wizard)
         term.clear()
         term.setCursorPos(1, 1)
         print("Relancer la configuration?")
@@ -397,7 +343,7 @@ local function processInput()
             local _, k = os.pullEvent("key")
             if k == keys.o then
                 config.setupComplete = false
-                utils.saveTable(CONFIG_PATH, config)
+                utils.saveTable(CONFIG_DATA, config)
                 os.reboot()
                 break
             elseif k == keys.n then
@@ -427,7 +373,7 @@ end
 
 local function autoSave()
     local now = os.epoch("utc") / 1000
-    if now - lastSaveTime < 60 then return end  -- Sauvegarde toutes les minutes
+    if now - lastSaveTime < 60 then return end
     
     lastSaveTime = now
     storage.saveStats()
@@ -436,19 +382,11 @@ end
 
 local function mainLoop()
     while running do
-        -- Tri automatique
         sortItems()
-        
-        -- Mise à jour affichage
         updateDisplay()
-        
-        -- Mise à jour alerte
         ui.updateAlert()
-        
-        -- Sauvegarde automatique
         autoSave()
         
-        -- Attendre input ou timeout
         local timer = os.startTimer(config.display.refreshRate)
         
         while true do
@@ -458,7 +396,6 @@ local function mainLoop()
                 break
             elseif event == "key" then
                 os.cancelTimer(timer)
-                -- Remettre l'événement dans la queue
                 os.queueEvent("key", p1)
                 processInput()
                 break
@@ -474,7 +411,8 @@ end
 local function main()
     term.clear()
     term.setCursorPos(1, 1)
-    print("Mob Tower Manager v1.0")
+    print("Mob Tower Manager v1.1")
+    print("Version 1.21 NeoForge")
     print("Chargement...")
     
     if not initialize() then
@@ -482,7 +420,6 @@ local function main()
         return
     end
     
-    -- Message de démarrage
     term.clear()
     term.setCursorPos(1, 1)
     print("Mob Tower Manager actif!")
@@ -494,7 +431,6 @@ local function main()
     print("  R - Reset stats session")
     print("  Q - Quitter")
     
-    -- Boucle principale
     local success, error = pcall(mainLoop)
     
     if not success then
@@ -502,7 +438,6 @@ local function main()
         print("Erreur: " .. tostring(error))
     end
     
-    -- Nettoyage
     storage.saveStats()
     utils.closeLog()
     

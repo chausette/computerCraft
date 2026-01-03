@@ -4,8 +4,9 @@
 -- Version 1.21 - Estimation des kills par items
 -- ============================================
 
-local utils = require("mobTower.lib.utils")
-local peripherals = require("mobTower.lib.peripherals")
+-- Charger les dépendances
+local utils = dofile("/mobTower/lib/utils.lua")
+local peripherals = dofile("/mobTower/lib/peripherals.lua")
 
 local storage = {}
 
@@ -29,19 +30,17 @@ local stats = {
     rareItems = {}
 }
 
-local DATA_FILE = "mobTower/data/stats.dat"
+local DATA_FILE = "/mobTower/data/stats.dat"
 
 -- Table de conversion items -> mobs estimés
--- Basé sur les drop rates moyens de Minecraft
 local MOB_ESTIMATES = {
-    ["minecraft:rotten_flesh"] = { mob = "zombie", rate = 1.0 },      -- 0-2 par zombie, moyenne ~1
-    ["minecraft:bone"] = { mob = "skeleton", rate = 0.5 },            -- 0-2 par skeleton
-    ["minecraft:arrow"] = { mob = "skeleton", rate = 0.25 },          -- 0-2 par skeleton (compte avec bone)
-    ["minecraft:gunpowder"] = { mob = "creeper", rate = 0.75 },       -- 0-2 par creeper
-    ["minecraft:ender_pearl"] = { mob = "enderman", rate = 1.0 },     -- 0-1 par enderman
-    ["minecraft:string"] = { mob = "spider", rate = 0.5 },            -- 0-2 par spider
-    ["minecraft:spider_eye"] = { mob = "spider", rate = 0.33 },       -- 0-1 par spider
-    -- Witch drops (estimations combinées)
+    ["minecraft:rotten_flesh"] = { mob = "zombie", rate = 1.0 },
+    ["minecraft:bone"] = { mob = "skeleton", rate = 0.5 },
+    ["minecraft:arrow"] = { mob = "skeleton", rate = 0.25 },
+    ["minecraft:gunpowder"] = { mob = "creeper", rate = 0.75 },
+    ["minecraft:ender_pearl"] = { mob = "enderman", rate = 1.0 },
+    ["minecraft:string"] = { mob = "spider", rate = 0.5 },
+    ["minecraft:spider_eye"] = { mob = "spider", rate = 0.33 },
     ["minecraft:redstone"] = { mob = "witch", rate = 0.25 },
     ["minecraft:glowstone_dust"] = { mob = "witch", rate = 0.25 },
     ["minecraft:sugar"] = { mob = "witch", rate = 0.25 },
@@ -57,16 +56,14 @@ function storage.init(config)
     collectorChest = config.storage.collectorChest
     sortingRules = config.storage.sortingRules or {}
     
-    -- Charger les stats sauvegardées
     storage.loadStats()
     
-    -- Initialiser la session
     stats.session.startTime = os.epoch("utc") / 1000
     stats.session.mobsKilled = 0
     stats.session.itemsCollected = 0
     stats.session.raresFound = 0
     
-    utils.log("Storage initialisé avec " .. #sortingRules .. " règles de tri")
+    utils.log("Storage initialise avec " .. #sortingRules .. " regles de tri")
 end
 
 -- ============================================
@@ -79,7 +76,7 @@ function storage.loadStats()
         stats.total = loaded.total or stats.total
         stats.hourly = loaded.hourly or {}
         stats.rareItems = loaded.rareItems or {}
-        utils.log("Stats chargées: " .. stats.total.mobsKilled .. " mobs total")
+        utils.log("Stats chargees: " .. stats.total.mobsKilled .. " mobs total")
     end
 end
 
@@ -103,10 +100,8 @@ function storage.getSessionTime()
 end
 
 function storage.resetSession()
-    -- Ajouter le temps de session au total
     stats.total.totalTime = stats.total.totalTime + storage.getSessionTime()
     
-    -- Reset session
     stats.session.startTime = os.epoch("utc") / 1000
     stats.session.mobsKilled = 0
     stats.session.itemsCollected = 0
@@ -135,7 +130,6 @@ function storage.resetAll()
     storage.saveStats()
 end
 
--- Enregistrer une heure de production
 function storage.recordHourlyStats()
     local currentHour = os.date("%Y-%m-%d-%H")
     
@@ -170,7 +164,6 @@ function storage.recordHourlyStats()
     end
 end
 
--- Obtenir les données horaires pour le graphique
 function storage.getHourlyData(hours)
     hours = hours or 12
     local data = {}
@@ -191,13 +184,11 @@ function storage.getHourlyData(hours)
     return data
 end
 
--- Incrémenter le compteur de mobs tués (estimation)
 function storage.addKill(count)
     count = count or 1
     stats.session.mobsKilled = stats.session.mobsKilled + count
     stats.total.mobsKilled = stats.total.mobsKilled + count
     
-    -- Ajouter aux stats horaires
     local currentHour = os.date("%Y-%m-%d-%H")
     if not stats.hourly[currentHour] then
         stats.hourly[currentHour] = { mobs = 0, items = 0 }
@@ -205,13 +196,11 @@ function storage.addKill(count)
     stats.hourly[currentHour].mobs = stats.hourly[currentHour].mobs + count
 end
 
--- Incrémenter le compteur d'items
 function storage.addItems(count)
     count = count or 1
     stats.session.itemsCollected = stats.session.itemsCollected + count
     stats.total.itemsCollected = stats.total.itemsCollected + count
     
-    -- Ajouter aux stats horaires
     local currentHour = os.date("%Y-%m-%d-%H")
     if not stats.hourly[currentHour] then
         stats.hourly[currentHour] = { mobs = 0, items = 0 }
@@ -219,26 +208,22 @@ function storage.addItems(count)
     stats.hourly[currentHour].items = stats.hourly[currentHour].items + count
 end
 
--- Enregistrer un item rare
 function storage.addRareItem(itemName, count)
     count = count or 1
     stats.session.raresFound = stats.session.raresFound + count
     stats.total.raresFound = stats.total.raresFound + count
     
-    -- Ajouter à la liste des items rares
     table.insert(stats.rareItems, 1, {
         name = itemName,
         count = count,
         time = os.epoch("utc") / 1000
     })
     
-    -- Garder seulement les 50 derniers
     while #stats.rareItems > 50 do
         table.remove(stats.rareItems)
     end
 end
 
--- Obtenir les derniers items rares
 function storage.getRecentRares(count)
     count = count or 5
     local result = {}
@@ -250,7 +235,6 @@ function storage.getRecentRares(count)
     return result
 end
 
--- Estimer les mobs tués depuis un item
 function storage.estimateMobsFromItem(itemName, count)
     local estimate = MOB_ESTIMATES[itemName]
     if estimate then
@@ -263,17 +247,13 @@ end
 -- TRI DES ITEMS
 -- ============================================
 
--- Trouver le baril destination pour un item
 function storage.findDestination(itemName)
-    -- Chercher une règle exacte
     for _, rule in ipairs(sortingRules) do
         if rule.pattern then
-            -- Règle avec pattern
             if string.find(itemName, rule.itemId) then
                 return rule.barrel
             end
         else
-            -- Règle exacte
             if itemName == rule.itemId then
                 return rule.barrel
             end
@@ -283,7 +263,6 @@ function storage.findDestination(itemName)
     return nil
 end
 
--- Trier un slot du coffre collecteur
 function storage.sortSlot(slot, item)
     if not collectorChest then return false, "No collector chest" end
     
@@ -297,13 +276,11 @@ function storage.sortSlot(slot, item)
     if transferred > 0 then
         storage.addItems(transferred)
         
-        -- Estimer les mobs tués
         local mobEstimate = storage.estimateMobsFromItem(item.name, transferred)
         if mobEstimate > 0 then
             storage.addKill(mobEstimate)
         end
         
-        -- Vérifier si item rare
         if utils.isRareItem(item.name, item.nbt) then
             storage.addRareItem(item.name, transferred)
             return true, "rare", transferred
@@ -315,7 +292,6 @@ function storage.sortSlot(slot, item)
     return false, "Transfer failed"
 end
 
--- Trier tout le coffre collecteur
 function storage.sortAll()
     if not collectorChest then 
         return { sorted = 0, failed = 0, rares = {} }
@@ -355,7 +331,6 @@ end
 -- SURVEILLANCE STOCKAGE
 -- ============================================
 
--- Obtenir l'état de tous les barils
 function storage.getStorageStatus()
     local status = {
         total = {
@@ -382,7 +357,6 @@ function storage.getStorageStatus()
         
         table.insert(status.barrels, barrelStatus)
         
-        -- Warnings
         if percent >= 100 then
             table.insert(status.warnings, {
                 level = "critical",

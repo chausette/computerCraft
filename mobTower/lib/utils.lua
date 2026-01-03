@@ -41,11 +41,9 @@ function utils.isRareItem(itemName, nbt)
     if utils.RARE_ITEMS[itemName] then
         return true
     end
-    -- Vérifie si l'item est enchanté
     if nbt and (nbt.Enchantments or nbt.StoredEnchantments) then
         return true
     end
-    -- Armures et armes
     if string.find(itemName, "_helmet") or
        string.find(itemName, "_chestplate") or
        string.find(itemName, "_leggings") or
@@ -109,7 +107,10 @@ end
 function utils.formatTimestamp(timestamp)
     if timestamp == nil then return "--:--" end
     local date = os.date("*t", timestamp)
-    return string.format("%02d:%02d", date.hour, date.min)
+    if date then
+        return string.format("%02d:%02d", date.hour, date.min)
+    end
+    return "--:--"
 end
 
 -- Sauvegarder une table dans un fichier
@@ -139,50 +140,15 @@ function utils.loadTable(filename)
     return nil
 end
 
--- Deep copy d'une table
-function utils.deepCopy(orig)
-    local copy
-    if type(orig) == 'table' then
-        copy = {}
-        for k, v in pairs(orig) do
-            copy[utils.deepCopy(k)] = utils.deepCopy(v)
-        end
-        setmetatable(copy, utils.deepCopy(getmetatable(orig)))
-    else
-        copy = orig
-    end
-    return copy
-end
-
--- Merger deux tables
-function utils.mergeTables(t1, t2)
-    for k, v in pairs(t2) do
-        if type(v) == "table" and type(t1[k]) == "table" then
-            utils.mergeTables(t1[k], v)
-        else
-            t1[k] = v
-        end
-    end
-    return t1
-end
-
 -- Obtenir le nom court d'un item
 function utils.getShortName(itemId)
     if itemId == nil then return "Unknown" end
     local name = itemId:gsub("minecraft:", "")
     name = name:gsub("_", " ")
-    -- Capitalize first letter of each word
     name = name:gsub("(%a)([%w_']*)", function(first, rest)
         return first:upper() .. rest:lower()
     end)
     return name
-end
-
--- Centrer une chaîne
-function utils.centerText(text, width)
-    local padding = math.floor((width - #text) / 2)
-    if padding < 0 then padding = 0 end
-    return string.rep(" ", padding) .. text
 end
 
 -- Tronquer une chaîne
@@ -191,42 +157,6 @@ function utils.truncate(text, maxLen)
         return text
     end
     return string.sub(text, 1, maxLen - 2) .. ".."
-end
-
--- Pad à droite
-function utils.padRight(text, width)
-    if #text >= width then
-        return string.sub(text, 1, width)
-    end
-    return text .. string.rep(" ", width - #text)
-end
-
--- Pad à gauche
-function utils.padLeft(text, width)
-    if #text >= width then
-        return string.sub(text, 1, width)
-    end
-    return string.rep(" ", width - #text) .. text
-end
-
--- Créer une barre de progression
-function utils.progressBar(current, max, width)
-    if max == 0 then max = 1 end
-    local percent = current / max
-    if percent > 1 then percent = 1 end
-    local filled = math.floor(percent * width)
-    local empty = width - filled
-    return string.rep("\127", filled) .. string.rep("\176", empty)
-end
-
--- Obtenir le timestamp actuel
-function utils.getTimestamp()
-    return os.epoch("utc") / 1000
-end
-
--- Vérifier si un fichier existe
-function utils.fileExists(path)
-    return fs.exists(path)
 end
 
 -- Créer un dossier si n'existe pas
@@ -240,12 +170,11 @@ end
 local logFile = nil
 function utils.log(message)
     if logFile == nil then
-        utils.ensureDir("mobTower/data")
-        logFile = fs.open("mobTower/data/debug.log", "a")
+        utils.ensureDir("/mobTower/data")
+        logFile = fs.open("/mobTower/data/debug.log", "a")
     end
     if logFile then
-        local timestamp = os.date("%Y-%m-%d %H:%M:%S")
-        logFile.write("[" .. timestamp .. "] " .. message .. "\n")
+        logFile.write("[" .. os.date("%H:%M:%S") .. "] " .. tostring(message) .. "\n")
         logFile.flush()
     end
 end
