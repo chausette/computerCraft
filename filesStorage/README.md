@@ -1,7 +1,10 @@
 # Système de Stockage ComputerCraft
 
 Un système complet de gestion d'inventaire avec tri automatique, recherche, favoris et contrôle à distance via Pocket Computer.
-
+ install 
+ ```
+wget run https://raw.githubusercontent.com/votre-repo/storage-system/main/installer.lua
+```
 ## 📦 Contenu
 
 - `config.lua` - Configuration (coffres, catégories, favoris)
