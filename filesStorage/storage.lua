@@ -442,4 +442,63 @@ function storage.listConnectedChests()
     return chests
 end
 
+-- === LECTURE DISQUETTE COLONIE ===
+
+-- Lit les données d'une disquette colonie
+function storage.readColonyDisk()
+    -- Cherche un lecteur de disque sur le réseau
+    local diskDrive = nil
+    for _, name in ipairs(peripheral.getNames()) do
+        if peripheral.getType(name) == "drive" then
+            diskDrive = name
+            break
+        end
+    end
+    
+    if not diskDrive then
+        return nil, "Aucun lecteur de disque trouve"
+    end
+    
+    -- Vérifie si un disque est présent
+    if not disk.isPresent(diskDrive) then
+        return nil, "Aucun disque dans le lecteur"
+    end
+    
+    local mountPath = disk.getMountPath(diskDrive)
+    if not mountPath then
+        return nil, "Disque non monte"
+    end
+    
+    -- Cherche un fichier JSON
+    local jsonFile = nil
+    local files = fs.list(mountPath)
+    for _, file in ipairs(files) do
+        if file:match("%.json$") then
+            jsonFile = mountPath .. "/" .. file
+            break
+        end
+    end
+    
+    if not jsonFile then
+        return nil, "Aucun fichier .json sur le disque"
+    end
+    
+    -- Lit le fichier
+    local file = fs.open(jsonFile, "r")
+    if not file then
+        return nil, "Impossible de lire le fichier"
+    end
+    
+    local content = file.readAll()
+    file.close()
+    
+    -- Parse le JSON
+    local data = textutils.unserialiseJSON(content)
+    if not data then
+        return nil, "Format JSON invalide"
+    end
+    
+    return data, nil
+end
+
 return storage

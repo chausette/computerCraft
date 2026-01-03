@@ -255,6 +255,14 @@ function network.handleRequest(storage, request)
             success = true,
             data = storage.checkAlerts()
         }
+    
+    elseif request.type == "read_colony_disk" then
+        local data, err = storage.readColonyDisk()
+        response = {
+            success = data ~= nil,
+            data = data,
+            error = err
+        }
     end
     
     return response

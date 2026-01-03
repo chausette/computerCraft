@@ -1144,6 +1144,348 @@ end
 
 -- === MENU GESTION COFFRES ===
 
+-- === LECTURE DISQUETTE COLONIE ===
+
+local function readColonyDisk()
+    -- Demande au serveur de lire le disque
+    local response, err = sendRequest({type = "read_colony_disk"}, 10)
+    
+    if not response then
+        return nil, err or "Pas de reponse du serveur"
+    end
+    
+    if not response.success then
+        return nil, response.error or "Erreur inconnue"
+    end
+    
+    return response.data, nil
+end
+
+local function colonyInterface()
+    clearScreen()
+    drawHeader("COLONIE")
+    writeAt(2, math.floor(h/2), "Lecture du disque...", colors_dim)
+    
+    local colonyData, err = readColonyDisk()
+    
+    if not colonyData then
+        showMessage("ERREUR", err, true)
+        return
+    end
+    
+    -- Filtre les items manquants
+    local missingItems = {}
+    for _, mat in ipairs(colonyData.materials or {}) do
+        if mat.missing and mat.missing > 0 then
+            table.insert(missingItems, {
+                name = mat.item,
+                displayName = mat.displayName or mat.item:gsub("^[^:]+:", ""),
+                needed = mat.needed or 0,
+                delivered = mat.delivered or 0,
+                missing = mat.missing
+            })
+        end
+    end
+    
+    if #missingItems == 0 then
+        showMessage("COLONIE", "Aucun item manquant!", false)
+        return
+    end
+    
+    -- Charge l'inventaire pour vérifier ce qu'on a
+    loadAllItems()
+    
+    -- Calcule ce qu'on peut envoyer
+    local canSend = {}
+    local totalCanSend = 0
+    
+    for _, missing in ipairs(missingItems) do
+        local inStock = 0
+        for _, item in ipairs(allItems) do
+            if item.name == missing.name then
+                inStock = item.count
+                break
+            end
+        end
+        
+        local toSend = math.min(missing.missing, inStock)
+        table.insert(canSend, {
+            name = missing.name,
+            displayName = missing.displayName,
+            missing = missing.missing,
+            inStock = inStock,
+            toSend = toSend
+        })
+        
+        if toSend > 0 then
+            totalCanSend = totalCanSend + 1
+        end
+    end
+    
+    -- Interface de sélection
+    local selectedIdx = 1
+    local scrollOffset = 0
+    local maxVisible = h - 7
+    local selectedForSend = {}  -- Items sélectionnés pour envoi
+    
+    -- Par défaut, sélectionne tous les items qu'on peut envoyer
+    for i, item in ipairs(canSend) do
+        if item.toSend > 0 then
+            selectedForSend[i] = item.toSend
+        end
+    end
+    
+    local function redraw()
+        clearScreen()
+        
+        local title = colonyData.colony or "Colonie"
+        if #title > w - 4 then title = title:sub(1, w - 7) .. "..." end
+        drawHeader(title)
+        
+        -- Info
+        writeAt(2, 2, "Manquants: " .. #missingItems .. " types", colors_dim)
+        writeAt(2, 3, "Dispo: " .. totalCanSend .. " types", colors_success)
+        
+        writeAt(1, 4, string.rep("-", w), colors_dim)
+        
+        local startY = 5
+        
+        for i = 1, maxVisible do
+            local idx = scrollOffset + i
+            local item = canSend[idx]
+            
+            if item then
+                local y = startY + i - 1
+                local isSelected = (idx == selectedIdx)
+                local isChecked = selectedForSend[idx] ~= nil
+                
+                if isSelected then
+                    term.setCursorPos(1, y)
+                    term.setBackgroundColor(colors_selected)
+                    term.write(string.rep(" ", w))
+                end
+                
+                -- Checkbox
+                local checkbox = isChecked and "[X]" or "[ ]"
+                local checkColor = isChecked and colors_success or colors_dim
+                writeAt(1, y, checkbox, checkColor, isSelected and colors_selected or colors_bg)
+                
+                -- Nom
+                local name = item.displayName
+                local maxLen = w - 16
+                if #name > maxLen then
+                    name = name:sub(1, maxLen - 2) .. ".."
+                end
+                
+                local nameColor = colors_text
+                if item.inStock == 0 then
+                    nameColor = colors_error
+                elseif item.inStock < item.missing then
+                    nameColor = colors_warning
+                end
+                
+                writeAt(5, y, name, nameColor, isSelected and colors_selected or colors_bg)
+                
+                -- Quantités: stock/manquant
+                local qtyStr = item.inStock .. "/" .. item.missing
+                writeAt(w - #qtyStr, y, qtyStr, colors_accent, isSelected and colors_selected or colors_bg)
+            end
+        end
+        
+        term.setBackgroundColor(colors_bg)
+        
+        -- Boutons en bas
+        writeAt(1, h - 2, string.rep("-", w), colors_dim)
+        
+        local sendCount = 0
+        for _ in pairs(selectedForSend) do sendCount = sendCount + 1 end
+        
+        writeAt(2, h - 1, "[Enter] ENVOYER (" .. sendCount .. ")", colors_success)
+        
+        drawFooter("^v:Nav Space:Sel A:Tous Bksp:Ret")
+    end
+    
+    redraw()
+    
+    while true do
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            if selectedIdx > 1 then
+                selectedIdx = selectedIdx - 1
+                if selectedIdx <= scrollOffset then
+                    scrollOffset = scrollOffset - 1
+                end
+            end
+            redraw()
+            
+        elseif key == keys.down then
+            if selectedIdx < #canSend then
+                selectedIdx = selectedIdx + 1
+                if selectedIdx > scrollOffset + maxVisible then
+                    scrollOffset = scrollOffset + 1
+                end
+            end
+            redraw()
+            
+        elseif key == keys.space then
+            -- Toggle sélection
+            local item = canSend[selectedIdx]
+            if item and item.toSend > 0 then
+                if selectedForSend[selectedIdx] then
+                    selectedForSend[selectedIdx] = nil
+                else
+                    selectedForSend[selectedIdx] = item.toSend
+                end
+            end
+            redraw()
+            
+        elseif key == keys.a then
+            -- Sélectionner/Désélectionner tout
+            local anySelected = false
+            for _ in pairs(selectedForSend) do
+                anySelected = true
+                break
+            end
+            
+            if anySelected then
+                selectedForSend = {}
+            else
+                for i, item in ipairs(canSend) do
+                    if item.toSend > 0 then
+                        selectedForSend[i] = item.toSend
+                    end
+                end
+            end
+            redraw()
+            
+        elseif key == keys.enter then
+            -- Envoyer les items sélectionnés
+            local toSendList = {}
+            for idx, qty in pairs(selectedForSend) do
+                table.insert(toSendList, {
+                    name = canSend[idx].name,
+                    displayName = canSend[idx].displayName,
+                    count = qty
+                })
+            end
+            
+            if #toSendList == 0 then
+                showMessage("INFO", "Aucun item selectionne", false)
+                redraw()
+            else
+                -- Envoyer les items
+                return "send", toSendList
+            end
+            
+        elseif key == keys.backspace then
+            return "back", nil
+        end
+    end
+end
+
+local function doSendColonyItems(itemsList)
+    if #itemsList == 0 then
+        return
+    end
+    
+    local maxRetries = 3
+    local totalSent = 0
+    local failedItems = {}
+    
+    clearScreen()
+    drawHeader("ENVOI COLONIE")
+    
+    for i, item in ipairs(itemsList) do
+        local y = 3 + i
+        local name = item.displayName
+        if #name > w - 12 then
+            name = name:sub(1, w - 15) .. ".."
+        end
+        
+        if y < h - 2 then
+            writeAt(2, y, name, colors_dim)
+            writeAt(w - 5, y, "...", colors_dim)
+        end
+        
+        local sent = 0
+        local remaining = item.count
+        
+        -- Retry jusqu'à 3 fois
+        for attempt = 1, maxRetries do
+            if remaining <= 0 then break end
+            
+            local response = sendRequest({
+                type = "retrieve_item",
+                itemName = item.name,
+                count = remaining
+            }, 15)
+            
+            if response and response.success and response.data then
+                sent = sent + response.data
+                remaining = remaining - response.data
+            end
+            
+            if remaining > 0 and attempt < maxRetries then
+                sleep(0.5)
+            end
+        end
+        
+        totalSent = totalSent + sent
+        
+        if y < h - 2 then
+            if sent >= item.count then
+                writeAt(w - 5, y, " OK ", colors_success)
+            elseif sent > 0 then
+                writeAt(w - 5, y, sent .. "/" .. item.count, colors_warning)
+            else
+                writeAt(w - 5, y, "FAIL", colors_error)
+            end
+        end
+        
+        if sent < item.count then
+            table.insert(failedItems, {
+                name = item.displayName,
+                wanted = item.count,
+                got = sent
+            })
+        end
+        
+        sleep(0.2)
+    end
+    
+    loadAllItems()
+    
+    -- Résultat
+    clearScreen()
+    
+    if #failedItems == 0 then
+        drawHeader("ENVOI OK")
+        writeAt(2, 4, "Tous les items envoyes!", colors_success)
+        writeAt(2, 6, "Total: " .. totalSent .. " items", colors_accent)
+    else
+        drawHeader("ENVOI PARTIEL")
+        writeAt(2, 3, "Envoyes: " .. totalSent .. " items", colors_success)
+        writeAt(2, 4, "Echecs: " .. #failedItems, colors_error)
+        
+        writeAt(1, 6, string.rep("-", w), colors_dim)
+        writeAt(2, 7, "ITEMS INCOMPLETS:", colors_warning)
+        
+        local y = 8
+        for i, fail in ipairs(failedItems) do
+            if y > h - 2 then break end
+            local name = fail.name
+            if #name > w - 12 then name = name:sub(1, w - 15) .. ".." end
+            writeAt(2, y, name, colors_warning)
+            writeAt(w - #(fail.got .. "/" .. fail.wanted), y, fail.got .. "/" .. fail.wanted, colors_error)
+            y = y + 1
+        end
+    end
+    
+    drawFooter("Appuyez sur une touche...")
+    os.pullEvent("key")
+end
+
 local function chestDetailInterface(chest)
     local selectedOption = 1
     
@@ -1537,6 +1879,7 @@ local function mainMenu()
             {text = "Rechercher"},
             {text = "Favoris"},
             {text = "Categories"},
+            {text = "Colonie (Disque)"},
             {text = "Gestion Coffres"},
             {text = "Statistiques"},
             {text = "Trier entree"},
@@ -1624,6 +1967,12 @@ local function mainMenu()
                 redraw()
             elseif opt.text == "Categories" then
                 categoriesInterface()
+                redraw()
+            elseif opt.text == "Colonie (Disque)" then
+                local action, items = colonyInterface()
+                if action == "send" and items then
+                    doSendColonyItems(items)
+                end
                 redraw()
             elseif opt.text == "Gestion Coffres" then
                 chestsInterface()
