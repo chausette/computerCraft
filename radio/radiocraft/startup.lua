@@ -193,7 +193,7 @@ local function handleButton(buttonId)
     
     -- Composer
     elseif buttonId == "comp_new" then
-        composer:new()
+        composer:reset()
     elseif buttonId == "comp_save" then
         -- Ouvre un dialogue simple
         composer:saveToDisk(composer:getComposition().name)

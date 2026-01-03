@@ -55,11 +55,17 @@ function Composer.new(speakers)
     -- Callbacks
     self.onUpdate = nil
     
+    -- Ajoute une piste par défaut
+    table.insert(self.composition.tracks, {
+        instrument = "harp",
+        notes = {}
+    })
+    
     return self
 end
 
 -- Crée une nouvelle composition
-function Composer:new()
+function Composer:reset()
     self.composition = {
         name = "Nouvelle composition",
         author = "Unknown",
