@@ -1,7 +1,7 @@
 -- ============================================
--- MOB TOWER MANAGER v1.3
+-- MOB TOWER MANAGER v1.4
 -- Version 1.21 NeoForge - TOUT EN UN
--- Avec wizard navigable et coffre overflow
+-- Boutons reactifs, vue stock, tri manuel
 -- ============================================
 
 -- ============================================
@@ -41,9 +41,7 @@ function utils.isRareItem(itemName, nbt)
     return false
 end
 
--- Liste étendue des items à trier
 utils.SORTABLE_ITEMS = {
-    -- Drops de mobs
     { id = "minecraft:rotten_flesh", name = "Rotten Flesh" },
     { id = "minecraft:bone", name = "Bone" },
     { id = "minecraft:arrow", name = "Arrow" },
@@ -56,42 +54,28 @@ utils.SORTABLE_ITEMS = {
     { id = "minecraft:blaze_rod", name = "Blaze Rod" },
     { id = "minecraft:ghast_tear", name = "Ghast Tear" },
     { id = "minecraft:magma_cream", name = "Magma Cream" },
-    
-    -- Drops Witch
     { id = "minecraft:redstone", name = "Redstone" },
     { id = "minecraft:glowstone_dust", name = "Glowstone" },
     { id = "minecraft:sugar", name = "Sugar" },
     { id = "minecraft:glass_bottle", name = "Glass Bottle" },
     { id = "minecraft:stick", name = "Stick" },
-    
-    -- Drops Zombie
     { id = "minecraft:iron_ingot", name = "Iron Ingot" },
     { id = "minecraft:carrot", name = "Carrot" },
     { id = "minecraft:potato", name = "Potato" },
-    
-    -- Arcs
     { id = "minecraft:bow", name = "Bow" },
     { id = "minecraft:crossbow", name = "Crossbow" },
-    
-    -- Potions (patterns)
     { id = "potion", name = "Potions (toutes)", pattern = true },
     { id = "splash_potion", name = "Potions Splash", pattern = true },
     { id = "lingering_potion", name = "Potions Lingering", pattern = true },
-    
-    -- Armures (patterns)
     { id = "_helmet", name = "Casques (tous)", pattern = true },
     { id = "_chestplate", name = "Plastrons (tous)", pattern = true },
     { id = "_leggings", name = "Jambieres (tous)", pattern = true },
     { id = "_boots", name = "Bottes (tous)", pattern = true },
-    
-    -- Outils (patterns)
     { id = "_sword", name = "Epees (toutes)", pattern = true },
     { id = "_pickaxe", name = "Pioches (toutes)", pattern = true },
     { id = "_axe", name = "Haches (toutes)", pattern = true },
     { id = "_shovel", name = "Pelles (toutes)", pattern = true },
     { id = "_hoe", name = "Houes (toutes)", pattern = true },
-    
-    -- Items rares
     { id = "_head", name = "Tetes de mob", pattern = true },
     { id = "_skull", name = "Cranes", pattern = true },
     { id = "music_disc", name = "Disques", pattern = true },
@@ -165,7 +149,7 @@ function utils.ensureDir(path)
 end
 
 -- ============================================
--- MENU NAVIGABLE (pour le wizard)
+-- MENU NAVIGABLE
 -- ============================================
 
 local function navigableMenu(title, options, allowNone)
@@ -174,7 +158,6 @@ local function navigableMenu(title, options, allowNone)
     local maxVisible = 10
     local totalOptions = #options
     
-    -- Ajouter option "Aucun" si permis
     if allowNone then
         table.insert(options, 1, { name = "[ Aucun / Passer ]", value = nil })
         totalOptions = #options
@@ -183,25 +166,19 @@ local function navigableMenu(title, options, allowNone)
     while true do
         term.clear()
         term.setCursorPos(1, 1)
-        
-        -- Titre
         term.setTextColor(colors.cyan)
         print(title)
         print(string.rep("-", #title))
         term.setTextColor(colors.white)
         print("")
-        
-        -- Instructions
         term.setTextColor(colors.lightGray)
         print("Fleches: naviguer | Entree: selectionner")
         print("")
         term.setTextColor(colors.white)
         
-        -- Afficher les options visibles
         local startIdx = scroll + 1
         local endIdx = math.min(scroll + maxVisible, totalOptions)
         
-        -- Indicateur scroll haut
         if scroll > 0 then
             term.setTextColor(colors.gray)
             print("  [...] " .. scroll .. " de plus en haut")
@@ -212,16 +189,12 @@ local function navigableMenu(title, options, allowNone)
             local opt = options[i]
             local prefix = (i == selected) and "> " or "  "
             local displayName = opt.name or opt
-            
             if type(displayName) == "table" then
                 displayName = displayName.name or tostring(displayName)
             end
-            
-            -- Tronquer si trop long
             if #displayName > 45 then
                 displayName = string.sub(displayName, 1, 42) .. "..."
             end
-            
             if i == selected then
                 term.setTextColor(colors.lime)
                 print(prefix .. displayName)
@@ -231,42 +204,29 @@ local function navigableMenu(title, options, allowNone)
             end
         end
         
-        -- Indicateur scroll bas
         if endIdx < totalOptions then
             term.setTextColor(colors.gray)
             print("  [...] " .. (totalOptions - endIdx) .. " de plus en bas")
             term.setTextColor(colors.white)
         end
         
-        -- Afficher info sélection
         print("")
         term.setTextColor(colors.yellow)
         print("Selection: " .. selected .. "/" .. totalOptions)
         term.setTextColor(colors.white)
         
-        -- Attendre input
         local event, key = os.pullEvent("key")
         
         if key == keys.up then
             selected = selected - 1
             if selected < 1 then selected = totalOptions end
-            -- Ajuster scroll
-            if selected < scroll + 1 then
-                scroll = selected - 1
-            end
-            if selected > scroll + maxVisible then
-                scroll = selected - maxVisible
-            end
+            if selected < scroll + 1 then scroll = selected - 1 end
+            if selected > scroll + maxVisible then scroll = selected - maxVisible end
         elseif key == keys.down then
             selected = selected + 1
             if selected > totalOptions then selected = 1 end
-            -- Ajuster scroll
-            if selected > scroll + maxVisible then
-                scroll = selected - maxVisible
-            end
-            if selected < scroll + 1 then
-                scroll = selected - 1
-            end
+            if selected > scroll + maxVisible then scroll = selected - maxVisible end
+            if selected < scroll + 1 then scroll = selected - 1 end
         elseif key == keys.pageUp then
             selected = selected - maxVisible
             if selected < 1 then selected = 1 end
@@ -294,7 +254,6 @@ local function navigableMenu(title, options, allowNone)
     end
 end
 
--- Menu pour sélectionner un inventaire
 local function selectInventory(title, inventories, allowNone)
     local options = {}
     for i, inv in ipairs(inventories) do
@@ -304,7 +263,6 @@ local function selectInventory(title, inventories, allowNone)
             index = i
         })
     end
-    
     local result, idx = navigableMenu(title, options, allowNone)
     return result, idx
 end
@@ -354,10 +312,7 @@ function peripherals.listAll()
             table.insert(result.other, { name = name, type = pType })
         end
     end
-    
-    -- Trier les inventaires par nom
     table.sort(result.inventories, function(a, b) return a.name < b.name end)
-    
     return result
 end
 
@@ -388,24 +343,46 @@ function peripherals.transferItems(fromInv, fromSlot, toInv, count)
     return transferred or 0
 end
 
-function peripherals.getFillPercent(invName)
+function peripherals.getInventoryInfo(invName)
     local inv = peripheral.wrap(invName)
-    if not inv then return 0 end
+    if not inv then return nil end
     local ok, size = pcall(function() return inv.size() end)
-    if not ok or size == 0 then return 0 end
+    if not ok then return nil end
     local items = peripherals.getInventoryContents(invName)
-    if not items then return 0 end
+    if not items then return nil end
+    
     local used = 0
-    for _ in pairs(items) do used = used + 1 end
-    return math.floor((used / size) * 100)
+    local totalItems = 0
+    for _, item in pairs(items) do
+        used = used + 1
+        totalItems = totalItems + item.count
+    end
+    
+    return {
+        size = size,
+        used = used,
+        free = size - used,
+        percent = math.floor((used / size) * 100),
+        totalItems = totalItems
+    }
+end
+
+function peripherals.getFillPercent(invName)
+    local info = peripherals.getInventoryInfo(invName)
+    if not info then return 0 end
+    return info.percent
 end
 
 function peripherals.setSpawnOff()
-    redstone.setOutput(redstoneConfig.side, not redstoneConfig.inverted)
+    if redstoneConfig.side then
+        redstone.setOutput(redstoneConfig.side, not redstoneConfig.inverted)
+    end
 end
 
 function peripherals.setSpawnOn()
-    redstone.setOutput(redstoneConfig.side, redstoneConfig.inverted)
+    if redstoneConfig.side then
+        redstone.setOutput(redstoneConfig.side, redstoneConfig.inverted)
+    end
 end
 
 function peripherals.toggleSpawn(currentState)
@@ -419,10 +396,6 @@ function peripherals.toggleSpawn(currentState)
 end
 
 function peripherals.getMonitor() return pCache.monitor end
-function peripherals.getMonitorSize()
-    if not pCache.monitor then return 0, 0 end
-    return pCache.monitor.getSize()
-end
 
 -- ============================================
 -- STORAGE
@@ -431,7 +404,7 @@ end
 local storage = {}
 local sortingRules = {}
 local collectorChest = nil
-local overflowChest = nil  -- NOUVEAU: coffre pour items non triés
+local overflowChest = nil
 local stats = {
     session = { startTime = 0, mobsKilled = 0, itemsCollected = 0, raresFound = 0 },
     total = { mobsKilled = 0, itemsCollected = 0, raresFound = 0, totalTime = 0 },
@@ -456,7 +429,7 @@ local MOB_ESTIMATES = {
 
 function storage.init(config)
     collectorChest = config.storage.collectorChest
-    overflowChest = config.storage.overflowChest  -- NOUVEAU
+    overflowChest = config.storage.overflowChest
     sortingRules = config.storage.sortingRules or {}
     storage.loadStats()
     stats.session.startTime = os.epoch("utc") / 1000
@@ -554,7 +527,6 @@ function storage.findDestination(itemName)
             if itemName == rule.itemId then return rule.barrel end
         end
     end
-    -- NOUVEAU: retourner le coffre overflow si configuré
     return overflowChest
 end
 
@@ -597,10 +569,91 @@ function storage.sortAll()
     return result
 end
 
+-- NOUVEAU: Obtenir le détail de tous les barils
+function storage.getAllBarrelsStatus()
+    local barrels = {}
+    
+    -- Ajouter les barils de tri
+    for _, rule in ipairs(sortingRules) do
+        local info = peripherals.getInventoryInfo(rule.barrel)
+        table.insert(barrels, {
+            name = rule.barrel,
+            itemId = rule.itemId,
+            itemName = utils.getShortName(rule.itemId),
+            info = info,
+            percent = info and info.percent or 0,
+            type = "sort"
+        })
+    end
+    
+    -- Ajouter le coffre overflow
+    if overflowChest then
+        local info = peripherals.getInventoryInfo(overflowChest)
+        table.insert(barrels, {
+            name = overflowChest,
+            itemId = "overflow",
+            itemName = "OVERFLOW",
+            info = info,
+            percent = info and info.percent or 0,
+            type = "overflow"
+        })
+    end
+    
+    -- Ajouter le collecteur
+    if collectorChest then
+        local info = peripherals.getInventoryInfo(collectorChest)
+        table.insert(barrels, {
+            name = collectorChest,
+            itemId = "collector",
+            itemName = "COLLECTEUR",
+            info = info,
+            percent = info and info.percent or 0,
+            type = "collector"
+        })
+    end
+    
+    return barrels
+end
+
+-- NOUVEAU: Tri forcé de tous les barils (réorganisation)
+function storage.deepSort(progressCallback)
+    local totalMoved = 0
+    local barrels = storage.getAllBarrelsStatus()
+    
+    -- Pour chaque baril de tri
+    for idx, barrel in ipairs(barrels) do
+        if barrel.type == "sort" then
+            if progressCallback then
+                progressCallback(idx, #barrels, barrel.itemName)
+            end
+            
+            local contents = peripherals.getInventoryContents(barrel.name)
+            if contents then
+                for slot, item in pairs(contents) do
+                    -- Si l'item ne correspond pas au baril
+                    local correctDest = storage.findDestination(item.name)
+                    if correctDest and correctDest ~= barrel.name then
+                        -- Déplacer vers le bon baril
+                        local moved = peripherals.transferItems(barrel.name, slot, correctDest, item.count)
+                        totalMoved = totalMoved + moved
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Trier aussi le collecteur
+    if progressCallback then
+        progressCallback(#barrels, #barrels, "Collecteur")
+    end
+    storage.sortAll()
+    
+    return totalMoved
+end
+
 function storage.getStorageStatus()
     local status = { total = { capacity = 0, used = 0, percent = 0 }, barrels = {}, warnings = {} }
     
-    -- Vérifier les barils de tri
     for _, rule in ipairs(sortingRules) do
         local percent = peripherals.getFillPercent(rule.barrel)
         status.total.capacity = status.total.capacity + 100
@@ -612,7 +665,6 @@ function storage.getStorageStatus()
         end
     end
     
-    -- Vérifier le coffre overflow
     if overflowChest then
         local percent = peripherals.getFillPercent(overflowChest)
         status.total.capacity = status.total.capacity + 100
@@ -630,8 +682,12 @@ function storage.getStorageStatus()
     return status
 end
 
+function storage.getSortingRules()
+    return sortingRules
+end
+
 -- ============================================
--- UI avec BOUTONS TACTILES
+-- UI avec BOUTONS TACTILES REACTIFS
 -- ============================================
 
 local ui = {}
@@ -640,6 +696,9 @@ local monitorName = nil
 local width, height = 0, 0
 local alertState = { active = false, message = "", startTime = 0, duration = 3 }
 local buttons = {}
+local currentScreen = "main"  -- main, stock
+local stockPage = 1
+local stockItemsPerPage = 8
 
 local theme = {
     bg = colors.black, header = colors.blue, headerText = colors.white,
@@ -829,7 +888,7 @@ function ui.drawStorage(x, y, storageStatus)
     y = y + 2
     local warningCount = 0
     for _, warning in ipairs(storageStatus.warnings) do
-        if warningCount >= 3 then break end
+        if warningCount >= 2 then break end
         local icon = warning.level == "critical" and "!" or ">"
         local color = warning.level == "critical" and theme.danger or theme.warning
         ui.writeLine(x, y, icon .. " " .. utils.truncate(warning.item, 12) .. ": " .. warning.percent .. "%", color)
@@ -844,14 +903,14 @@ function ui.drawRareItems(x, y, rareItems)
     ui.writeLine(x, y, "* ITEMS RARES", theme.rare)
     y = y + 2
     if not rareItems or #rareItems == 0 then
-        ui.writeLine(x, y, "Aucun pour l'instant", theme.textDim)
+        ui.writeLine(x, y, "Aucun", theme.textDim)
         return
     end
     for i, item in ipairs(rareItems) do
-        if i > 4 then break end
+        if i > 3 then break end
         ui.writeLine(x, y, "> ", theme.rare)
-        ui.writeLine(x + 2, y, utils.truncate(utils.getShortName(item.name), 14), theme.text)
-        ui.writeLine(x + 18, y, utils.formatTimestamp(item.time), theme.textDim)
+        ui.writeLine(x + 2, y, utils.truncate(utils.getShortName(item.name), 12), theme.text)
+        ui.writeLine(x + 16, y, utils.formatTimestamp(item.time), theme.textDim)
         y = y + 1
     end
 end
@@ -860,18 +919,21 @@ function ui.drawFooter(y)
     if not monitor then return end
     ui.drawLine(y, "-", theme.border)
     y = y + 1
-    local btnWidth = 10
-    local spacing = 2
+    local btnWidth = 8
+    local spacing = 1
     local startX = 2
-    ui.drawButton(startX, y, btnWidth, 1, "CONFIG", "config", false)
-    ui.drawButton(startX + btnWidth + spacing, y, btnWidth, 1, "RESET", "reset", false)
-    ui.drawButton(startX + (btnWidth + spacing) * 2, y, btnWidth, 1, "QUITTER", "quit", false)
+    ui.drawButton(startX, y, btnWidth, 1, "STOCK", "stock", false)
+    ui.drawButton(startX + btnWidth + spacing, y, btnWidth, 1, "TRI", "sort", false)
+    ui.drawButton(startX + (btnWidth + spacing) * 2, y, btnWidth, 1, "CONFIG", "config", false)
+    ui.drawButton(startX + (btnWidth + spacing) * 3, y, btnWidth, 1, "RESET", "reset", false)
+    ui.drawButton(startX + (btnWidth + spacing) * 4, y, btnWidth, 1, "QUIT", "quit", false)
 end
 
 function ui.drawMainScreen(data)
     if not monitor then return end
     ui.clear()
-    ui.drawHeader("MOB TOWER v1.3", data.spawnOn, data.sessionTime)
+    currentScreen = "main"
+    ui.drawHeader("MOB TOWER v1.4", data.spawnOn, data.sessionTime)
     ui.drawLine(2)
     local leftCol = 2
     local rightCol = math.floor(width / 2) + 2
@@ -884,6 +946,127 @@ function ui.drawMainScreen(data)
     ui.drawRareItems(rightCol, midLine + 2, data.rareItems)
     ui.drawFooter(height - 1)
     if alertState.active then ui.drawAlert() end
+end
+
+-- NOUVEAU: Écran de détail du stock avec pagination
+function ui.drawStockScreen(barrels, page)
+    if not monitor then return end
+    ui.clear()
+    currentScreen = "stock"
+    stockPage = page or 1
+    
+    local totalPages = math.ceil(#barrels / stockItemsPerPage)
+    if stockPage > totalPages then stockPage = totalPages end
+    if stockPage < 1 then stockPage = 1 end
+    
+    -- Header
+    monitor.setTextColor(theme.headerText)
+    monitor.setBackgroundColor(theme.header)
+    monitor.setCursorPos(1, 1)
+    monitor.write(string.rep(" ", width))
+    monitor.setCursorPos(2, 1)
+    monitor.write("# DETAIL STOCKAGE - Page " .. stockPage .. "/" .. totalPages)
+    
+    -- Bouton retour
+    ui.drawButton(width - 8, 1, 8, 1, "RETOUR", "back", false)
+    monitor.setBackgroundColor(theme.bg)
+    
+    ui.drawLine(2)
+    
+    -- Liste des barils
+    local startIdx = (stockPage - 1) * stockItemsPerPage + 1
+    local endIdx = math.min(startIdx + stockItemsPerPage - 1, #barrels)
+    
+    local y = 3
+    for i = startIdx, endIdx do
+        local barrel = barrels[i]
+        if barrel then
+            local info = barrel.info
+            local itemName = utils.truncate(barrel.itemName, 18)
+            local percent = barrel.percent
+            
+            -- Couleur selon le type et le remplissage
+            local nameColor = theme.text
+            if barrel.type == "overflow" then
+                nameColor = theme.warning
+            elseif barrel.type == "collector" then
+                nameColor = theme.accent
+            end
+            
+            local barColor = theme.graphBar
+            if percent >= 90 then barColor = theme.danger
+            elseif percent >= 75 then barColor = theme.warning end
+            
+            -- Nom de l'item
+            ui.writeLine(2, y, itemName, nameColor)
+            
+            -- Barre de progression
+            ui.drawProgressBar(22, y, 20, percent, barColor)
+            
+            -- Pourcentage et slots
+            local percentText = string.format("%3d%%", percent)
+            ui.writeLine(43, y, percentText, percent >= 90 and theme.danger or theme.text)
+            
+            if info then
+                local slotsText = string.format("%2d/%2d", info.used, info.size)
+                ui.writeLine(48, y, slotsText, theme.textDim)
+            end
+            
+            y = y + 1
+        end
+    end
+    
+    -- Footer avec navigation
+    ui.drawLine(height - 2)
+    local footerY = height - 1
+    
+    if stockPage > 1 then
+        ui.drawButton(2, footerY, 8, 1, "< PREC", "prev_page", false)
+    end
+    
+    ui.drawButton(math.floor(width/2) - 4, footerY, 8, 1, "RETOUR", "back", false)
+    
+    if stockPage < totalPages then
+        ui.drawButton(width - 9, footerY, 8, 1, "SUIV >", "next_page", false)
+    end
+end
+
+-- NOUVEAU: Écran de progression du tri
+function ui.drawSortProgress(current, total, itemName)
+    if not monitor then return end
+    
+    local y = math.floor(height / 2) - 2
+    local boxWidth = 40
+    local x = math.floor((width - boxWidth) / 2)
+    
+    -- Fond
+    for dy = -1, 3 do
+        monitor.setCursorPos(x - 1, y + dy)
+        monitor.setBackgroundColor(theme.border)
+        monitor.write(string.rep(" ", boxWidth + 2))
+    end
+    
+    -- Contenu
+    monitor.setBackgroundColor(theme.bg)
+    for dy = 0, 2 do
+        monitor.setCursorPos(x, y + dy)
+        monitor.write(string.rep(" ", boxWidth))
+    end
+    
+    -- Texte
+    monitor.setCursorPos(x + 2, y)
+    monitor.setTextColor(theme.accent)
+    monitor.write("TRI EN COURS...")
+    
+    monitor.setCursorPos(x + 2, y + 1)
+    monitor.setTextColor(theme.text)
+    monitor.write(utils.truncate(itemName or "", boxWidth - 4))
+    
+    -- Barre de progression
+    local percent = math.floor((current / total) * 100)
+    ui.drawProgressBar(x + 2, y + 2, boxWidth - 4, percent, theme.graphBar)
+    
+    monitor.setBackgroundColor(theme.bg)
 end
 
 function ui.showAlert(message, duration)
@@ -920,17 +1103,25 @@ function ui.drawAlert()
     monitor.setBackgroundColor(theme.bg)
 end
 
+function ui.getCurrentScreen()
+    return currentScreen
+end
+
+function ui.getStockPage()
+    return stockPage
+end
+
 -- ============================================
 -- CONFIGURATION
 -- ============================================
 
 local config = {
-    version = "1.3",
+    version = "1.4",
     player = { name = "MikeChausette", detectionRange = 16 },
     peripherals = { playerDetector = nil, monitor = nil },
     redstone = { side = "back", inverted = false },
     storage = { collectorChest = nil, overflowChest = nil, sortingRules = {} },
-    display = { refreshRate = 1, graphHours = 12, rareItemsCount = 5, alertDuration = 5 },
+    display = { refreshRate = 0.5, graphHours = 12, rareItemsCount = 5, alertDuration = 5 },
     sorting = { interval = 5, enabled = true },
     setupComplete = false
 }
@@ -938,7 +1129,7 @@ local config = {
 local CONFIG_FILE = "/mobTower/data/config.dat"
 
 -- ============================================
--- SETUP WIZARD AMELIORE
+-- SETUP WIZARD
 -- ============================================
 
 local function setupWizard()
@@ -947,7 +1138,7 @@ local function setupWizard()
     
     term.setTextColor(colors.cyan)
     print("============================================")
-    print("   MOB TOWER MANAGER v1.3 - Setup Wizard")
+    print("   MOB TOWER MANAGER v1.4 - Setup Wizard")
     print("============================================")
     term.setTextColor(colors.white)
     print("")
@@ -993,14 +1184,6 @@ local function setupWizard()
         end
         local result = navigableMenu("[3/8] Choisir le Player Detector", options, true)
         config.peripherals.playerDetector = result
-    else
-        term.clear()
-        term.setCursorPos(1, 1)
-        term.setTextColor(colors.yellow)
-        print("[3/8] Aucun Player Detector trouve")
-        term.setTextColor(colors.white)
-        print("(Optionnel - continue sans)")
-        sleep(1)
     end
     
     -- Monitor
@@ -1008,7 +1191,6 @@ local function setupWizard()
         term.clear()
         term.setTextColor(colors.red)
         print("ERREUR: Aucun moniteur trouve!")
-        term.setTextColor(colors.white)
         return false
     end
     local monOptions = {}
@@ -1030,13 +1212,8 @@ local function setupWizard()
         term.clear()
         term.setCursorPos(1, 1)
         term.setTextColor(colors.cyan)
-        print("Inverser le signal redstone?")
+        print("Inverser le signal redstone? (o/n)")
         term.setTextColor(colors.white)
-        print("")
-        print("Normal: signal OFF = lampes eteintes = spawn ON")
-        print("Inverse: signal ON = lampes eteintes = spawn ON")
-        print("")
-        print("(o)ui / (n)on")
         local inv = read()
         config.redstone.inverted = (inv:lower() == "o")
     else
@@ -1048,15 +1225,13 @@ local function setupWizard()
         term.clear()
         term.setTextColor(colors.red)
         print("ERREUR: Aucun inventaire trouve!")
-        term.setTextColor(colors.white)
         return false
     end
     
-    local collectorResult = selectInventory("[6/8] Coffre COLLECTEUR (entree des items)", allPeripherals.inventories, false)
+    local collectorResult = selectInventory("[6/8] Coffre COLLECTEUR", allPeripherals.inventories, false)
     if not collectorResult then return false end
     config.storage.collectorChest = collectorResult
     
-    -- Retirer le collecteur de la liste
     local remainingInv = {}
     for _, inv in ipairs(allPeripherals.inventories) do
         if inv.name ~= config.storage.collectorChest then
@@ -1064,11 +1239,10 @@ local function setupWizard()
         end
     end
     
-    -- Coffre overflow (NOUVEAU)
+    -- Coffre overflow
     local overflowResult = selectInventory("[7/8] Coffre OVERFLOW (items non tries)", remainingInv, true)
     config.storage.overflowChest = overflowResult
     
-    -- Retirer l'overflow de la liste
     if overflowResult then
         local temp = {}
         for _, inv in ipairs(remainingInv) do
@@ -1086,14 +1260,6 @@ local function setupWizard()
     print("[8/8] Attribution des barils de tri")
     term.setTextColor(colors.white)
     print("")
-    print("Pour chaque item, choisissez un baril.")
-    print("Les items non configures iront dans")
-    if config.storage.overflowChest then
-        print("le coffre overflow: " .. config.storage.overflowChest)
-    else
-        print("AUCUN coffre (resteront dans collecteur)")
-    end
-    print("")
     print("Barils disponibles: " .. #remainingInv)
     print("")
     print("Appuyez sur une touche...")
@@ -1102,17 +1268,10 @@ local function setupWizard()
     config.storage.sortingRules = {}
     
     for _, item in ipairs(utils.SORTABLE_ITEMS) do
-        if #remainingInv == 0 then
-            term.clear()
-            term.setTextColor(colors.yellow)
-            print("Plus de barils disponibles!")
-            term.setTextColor(colors.white)
-            sleep(1)
-            break
-        end
+        if #remainingInv == 0 then break end
         
         local barrelResult, idx = selectInventory(
-            "Baril pour: " .. item.name .. " (" .. #remainingInv .. " dispo)",
+            "Baril pour: " .. item.name,
             remainingInv,
             true
         )
@@ -1123,8 +1282,7 @@ local function setupWizard()
                 barrel = barrelResult,
                 pattern = item.pattern or false
             })
-            -- Retirer le baril utilisé
-            table.remove(remainingInv, idx - 1)  -- -1 car on a ajouté "Aucun" en position 1
+            table.remove(remainingInv, idx - 1)
         end
     end
     
@@ -1132,31 +1290,17 @@ local function setupWizard()
     term.clear()
     term.setCursorPos(1, 1)
     term.setTextColor(colors.lime)
-    print("============================================")
-    print("   Configuration terminee!")
-    print("============================================")
+    print("Configuration terminee!")
     term.setTextColor(colors.white)
     print("")
-    print("Resume:")
-    print("  Joueur: " .. config.player.name)
-    print("  Player Detector: " .. (config.peripherals.playerDetector or "Non"))
-    print("  Moniteur: " .. config.peripherals.monitor)
-    print("  Redstone: " .. (config.redstone.side or "Non"))
-    print("  Collecteur: " .. config.storage.collectorChest)
-    print("  Overflow: " .. (config.storage.overflowChest or "Non"))
-    print("  Regles de tri: " .. #config.storage.sortingRules)
+    print("Regles de tri: " .. #config.storage.sortingRules)
     print("")
     
     config.setupComplete = true
     utils.ensureDir("/mobTower/data")
     utils.saveTable(CONFIG_FILE, config)
     
-    term.setTextColor(colors.yellow)
-    print("CONSEIL: Touchez le moniteur pour")
-    print("interagir avec les boutons!")
-    term.setTextColor(colors.white)
-    print("")
-    print("Appuyez sur une touche pour demarrer...")
+    print("Appuyez sur une touche...")
     os.pullEvent("key")
     
     return true
@@ -1207,28 +1351,63 @@ local function initialize()
 end
 
 local function updateDisplay()
-    local sts = storage.getStats()
-    local playerPresent = peripherals.isPlayerPresent(config.player.name, config.player.detectionRange)
-    
-    ui.drawMainScreen({
-        spawnOn = spawnOn,
-        sessionTime = storage.getSessionTime(),
-        playerPresent = playerPresent,
-        stats = { session = sts.session, total = sts.total },
-        hourlyData = storage.getHourlyData(config.display.graphHours),
-        storageStatus = storage.getStorageStatus(),
-        rareItems = storage.getRecentRares(config.display.rareItemsCount)
-    })
+    if ui.getCurrentScreen() == "main" then
+        local sts = storage.getStats()
+        local playerPresent = peripherals.isPlayerPresent(config.player.name, config.player.detectionRange)
+        
+        ui.drawMainScreen({
+            spawnOn = spawnOn,
+            sessionTime = storage.getSessionTime(),
+            playerPresent = playerPresent,
+            stats = { session = sts.session, total = sts.total },
+            hourlyData = storage.getHourlyData(config.display.graphHours),
+            storageStatus = storage.getStorageStatus(),
+            rareItems = storage.getRecentRares(config.display.rareItemsCount)
+        })
+    elseif ui.getCurrentScreen() == "stock" then
+        local barrels = storage.getAllBarrelsStatus()
+        ui.drawStockScreen(barrels, ui.getStockPage())
+    end
 end
 
 local function handleMonitorTouch(x, y)
     local buttonId = ui.checkButtonClick(x, y)
+    if not buttonId then return end
     
     if buttonId == "spawn" then
         if config.redstone.side then
             local _, newState = peripherals.toggleSpawn(spawnOn)
             spawnOn = newState
         end
+    elseif buttonId == "stock" then
+        stockPage = 1
+        local barrels = storage.getAllBarrelsStatus()
+        ui.drawStockScreen(barrels, 1)
+    elseif buttonId == "back" then
+        updateDisplay()
+    elseif buttonId == "prev_page" then
+        stockPage = stockPage - 1
+        if stockPage < 1 then stockPage = 1 end
+        local barrels = storage.getAllBarrelsStatus()
+        ui.drawStockScreen(barrels, stockPage)
+    elseif buttonId == "next_page" then
+        stockPage = stockPage + 1
+        local barrels = storage.getAllBarrelsStatus()
+        local totalPages = math.ceil(#barrels / stockItemsPerPage)
+        if stockPage > totalPages then stockPage = totalPages end
+        ui.drawStockScreen(barrels, stockPage)
+    elseif buttonId == "sort" then
+        -- Tri forcé avec progression
+        ui.showAlert("Tri en cours...", 1)
+        updateDisplay()
+        
+        local moved = storage.deepSort(function(current, total, itemName)
+            ui.drawSortProgress(current, total, itemName)
+            sleep(0.1)
+        end)
+        
+        ui.showAlert("Tri termine! " .. moved .. " items", 3)
+        updateDisplay()
     elseif buttonId == "config" then
         config.setupComplete = false
         utils.saveTable(CONFIG_FILE, config)
@@ -1236,6 +1415,7 @@ local function handleMonitorTouch(x, y)
     elseif buttonId == "reset" then
         storage.resetSession()
         ui.showAlert("Stats reset!", 2)
+        updateDisplay()
     elseif buttonId == "quit" then
         running = false
     end
@@ -1243,6 +1423,8 @@ end
 
 local function sortItems()
     if not config.sorting.enabled then return end
+    if ui.getCurrentScreen() ~= "main" then return end
+    
     local now = os.epoch("utc") / 1000
     if now - lastSortTime < config.sorting.interval then return end
     lastSortTime = now
@@ -1267,6 +1449,7 @@ local function mainLoop()
         ui.updateAlert()
         autoSave()
         
+        -- Timer court pour réactivité
         local timer = os.startTimer(config.display.refreshRate)
         
         while true do
@@ -1275,11 +1458,9 @@ local function mainLoop()
             if event == "timer" and p1 == timer then
                 break
             elseif event == "monitor_touch" then
-                if p1 == config.peripherals.monitor then
-                    os.cancelTimer(timer)
-                    handleMonitorTouch(p2, p3)
-                    break
-                end
+                os.cancelTimer(timer)
+                handleMonitorTouch(p2, p3)
+                break
             elseif event == "key" then
                 os.cancelTimer(timer)
                 if p1 == keys.q then
@@ -1310,7 +1491,7 @@ end
 term.clear()
 term.setCursorPos(1, 1)
 term.setTextColor(colors.cyan)
-print("Mob Tower Manager v1.3")
+print("Mob Tower Manager v1.4")
 term.setTextColor(colors.white)
 print("Chargement...")
 
@@ -1322,17 +1503,14 @@ end
 term.clear()
 term.setCursorPos(1, 1)
 term.setTextColor(colors.lime)
-print("Mob Tower Manager v1.3 actif!")
+print("Mob Tower Manager v1.4 actif!")
 term.setTextColor(colors.white)
 print("")
 print(">>> TOUCHEZ LE MONITEUR <<<")
-print("pour interagir avec l'interface")
 print("")
-print("Boutons:")
-print("  - ON/OFF : Toggle lampes")
-print("  - CONFIG : Reconfigurer")
-print("  - RESET  : Reset stats")
-print("  - QUITTER: Arreter")
+print("Nouveaux boutons:")
+print("  - STOCK : Voir tous les barils")
+print("  - TRI   : Forcer le tri")
 
 pcall(mainLoop)
 storage.saveStats()
