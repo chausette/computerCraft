@@ -1,10 +1,10 @@
-# 🗼 Mob Tower Manager v1.2
+# 🗼 Mob Tower Manager v1.3
 
 Un programme ComputerCraft pour gérer et automatiser votre tour à mobs.
 
 **Compatible Minecraft 1.21.x NeoForge**
 
-![Version](https://img.shields.io/badge/version-1.2-blue)
+![Version](https://img.shields.io/badge/version-1.3-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x-green)
 ![Loader](https://img.shields.io/badge/Loader-NeoForge-orange)
 
@@ -17,6 +17,7 @@ Un programme ComputerCraft pour gérer et automatiser votre tour à mobs.
 - 🔢 **Statistiques** : mobs tués (estimation), items collectés
 - 📈 **Graphique de production** par heure
 - 📦 **Tri automatique** des drops vers les barils
+- 🗑️ **Coffre overflow** pour les items non triés
 - ⚠️ **Alertes visuelles** pour items rares
 - 💡 **Contrôle du spawn** via bouton tactile
 - 👤 **Détection du joueur** (optionnel)
@@ -24,12 +25,17 @@ Un programme ComputerCraft pour gérer et automatiser votre tour à mobs.
 
 ---
 
-## 🆕 Nouveautés v1.2
+## 🆕 Nouveautés v1.3
 
-- ✅ **Boutons tactiles** sur le moniteur (plus besoin du clavier !)
+- ✅ **Wizard navigable** avec flèches haut/bas (fini les listes interminables !)
+- ✅ **Coffre overflow** pour les items sans règle de tri
+- ✅ Navigation rapide: PageUp/PageDown, Home/End
+- ✅ Meilleure organisation du wizard
+
+### v1.2
+- ✅ **Boutons tactiles** sur le moniteur
 - ✅ **Plus d'items triés** : arcs, potions, outils, armures
 - ✅ Support `player_detector` (Advanced Peripherals 1.21)
-- ✅ Shulker boxes reconnues comme inventaires
 
 ---
 
@@ -95,16 +101,29 @@ wget https://raw.githubusercontent.com/chausette/computerCraft/master/mobTower/s
 
 ## ⚙️ Configuration
 
-### Premier lancement
+### Premier lancement - Wizard navigable
 
-Au premier lancement, le **Setup Wizard** te guidera pour :
+Au premier lancement, le **Setup Wizard** te guidera avec une interface navigable :
 
+**Navigation :**
+- ⬆️⬇️ Flèches haut/bas pour naviguer
+- ↵ Entrée pour sélectionner
+- Page Up/Down pour aller plus vite
+- Home/End pour aller au début/fin
+
+**Étapes :**
 1. 👤 Entrer ton pseudo Minecraft
-2. 📡 Sélectionner le Player Detector (si disponible)
-3. 🖥️ Sélectionner le moniteur
-4. 🔴 Configurer le côté redstone pour les lampes
-5. 📦 Sélectionner le coffre collecteur
-6. 🗂️ Attribuer chaque baril à un type d'item
+2. 📡 Scan des périphériques
+3. 🔍 Sélectionner le Player Detector (optionnel)
+4. 🖥️ Sélectionner le moniteur
+5. 🔴 Configurer le côté redstone pour les lampes
+6. 📥 Sélectionner le **coffre collecteur** (entrée des items)
+7. 🗑️ Sélectionner le **coffre overflow** (items non triés)
+8. 🗂️ Attribuer chaque baril à un type d'item
+
+### Coffre Overflow
+
+Le coffre overflow reçoit tous les items qui n'ont pas de règle de tri configurée. Pratique pour ne pas bloquer le système avec des items inattendus !
 
 ### Reconfigurer
 
@@ -285,6 +304,12 @@ Active HTTP dans la config du mod :
 ---
 
 ## 📜 Changelog
+
+### v1.3 (1.21 NeoForge)
+- ✅ **Wizard navigable** avec flèches haut/bas
+- ✅ **Coffre overflow** pour items non triés
+- ✅ Navigation rapide: PageUp/PageDown, Home/End
+- ✅ Tri des inventaires par nom
 
 ### v1.2 (1.21 NeoForge)
 - ✅ **Boutons tactiles** sur le moniteur !
