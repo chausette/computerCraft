@@ -3,30 +3,29 @@
 -- Version 1.21 NeoForge
 -- ============================================
 
-local REPO = "chausette/computerCraft"
+-- CONFIGURATION - Modifie ces lignes avec ton repo GitHub
+local GITHUB_USER = "chausette"
+local GITHUB_REPO = "computerCraft"
 local BRANCH = "master"
-local BASE_URL = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/mobTower"
+
+local BASE_URL = "https://raw.githubusercontent.com/" .. GITHUB_USER .. "/" .. GITHUB_REPO .. "/" .. BRANCH .. "/mobTower"
 
 local FILES = {
-    { path = "/mobTower.lua", dest = "/mobTower/mobTower.lua" },
-    { path = "/config.lua", dest = "/mobTower/config.lua" },
-    { path = "/startup.lua", dest = "/startup.lua" },
-    { path = "/lib/utils.lua", dest = "/mobTower/lib/utils.lua" },
-    { path = "/lib/peripherals.lua", dest = "/mobTower/lib/peripherals.lua" },
-    { path = "/lib/storage.lua", dest = "/mobTower/lib/storage.lua" },
-    { path = "/lib/ui.lua", dest = "/mobTower/lib/ui.lua" },
+    { url = "/mobTower.lua", dest = "/mobTower/mobTower.lua" },
+    { url = "/startup.lua", dest = "/startup.lua" },
 }
 
+-- Couleurs
 local function setColor(color)
     if term.isColor() then
         term.setTextColor(color)
     end
 end
 
+-- Header
 local function header()
     term.clear()
     term.setCursorPos(1, 1)
-    
     setColor(colors.cyan)
     print("============================================")
     print("   MOB TOWER MANAGER v1.1 - Installer")
@@ -36,24 +35,23 @@ local function header()
     print("")
 end
 
+-- Créer dossier
 local function ensureDir(path)
     if not fs.exists(path) then
         fs.makeDir(path)
     end
 end
 
+-- Télécharger fichier
 local function downloadFile(url, dest)
     local response = http.get(url)
-    
     if response then
         local content = response.readAll()
         response.close()
-        
         local dir = fs.getDir(dest)
         if dir and dir ~= "" then
             ensureDir(dir)
         end
-        
         local file = fs.open(dest, "w")
         if file then
             file.write(content)
@@ -61,10 +59,10 @@ local function downloadFile(url, dest)
             return true
         end
     end
-    
     return false
 end
 
+-- Vérifier HTTP
 local function checkHTTP()
     if not http then
         setColor(colors.red)
@@ -72,93 +70,65 @@ local function checkHTTP()
         print("")
         setColor(colors.yellow)
         print("Pour activer HTTP:")
-        print("1. Ouvrez computercraft-server.toml")
-        print("2. Trouvez 'http_enable'")
-        print("3. Mettez-le a true")
-        print("4. Redemarrez le serveur")
+        print("1. Ouvrez le fichier:")
+        print("   config/computercraft-server.toml")
+        print("2. Trouvez: http { enabled = false }")
+        print("3. Changez en: http { enabled = true }")
+        print("4. Redemarrez le serveur/jeu")
         setColor(colors.white)
         return false
     end
     return true
 end
 
+-- Menu principal
 local function mainMenu()
     header()
-    
     print("Que voulez-vous faire?")
     print("")
     setColor(colors.lime)
-    print("  1. Nouvelle installation")
-    setColor(colors.yellow)
-    print("  2. Mise a jour")
+    print("  1. Installer / Mettre a jour")
     setColor(colors.red)
-    print("  3. Desinstaller")
+    print("  2. Desinstaller")
     setColor(colors.lightGray)
-    print("  4. Quitter")
+    print("  3. Quitter")
     setColor(colors.white)
     print("")
-    write("Choix (1-4): ")
-    
-    local choice = read()
-    return tonumber(choice)
+    write("Choix (1-3): ")
+    return tonumber(read())
 end
 
-local function install(update)
+-- Installation
+local function install()
     header()
-    
-    if update then
-        setColor(colors.yellow)
-        print("MISE A JOUR")
-    else
-        setColor(colors.lime)
-        print("INSTALLATION")
-    end
+    setColor(colors.lime)
+    print("INSTALLATION")
     setColor(colors.white)
     print("")
     
+    -- Info mods
     setColor(colors.cyan)
     print("Mods requis:")
     print("  - CC: Tweaked")
-    print("  - Advanced Peripherals")
+    print("  - Advanced Peripherals (optionnel)")
     setColor(colors.white)
     print("")
     
+    -- Créer dossiers
     print("Creation des dossiers...")
     ensureDir("/mobTower")
-    ensureDir("/mobTower/lib")
     ensureDir("/mobTower/data")
     
-    -- Sauvegarder les données si mise à jour
-    local savedData = nil
-    if update and fs.exists("/mobTower/data/config.dat") then
-        print("Sauvegarde de la configuration...")
-        local file = fs.open("/mobTower/data/config.dat", "r")
-        if file then
-            savedData = file.readAll()
-            file.close()
-        end
-    end
-    
-    local savedStats = nil
-    if update and fs.exists("/mobTower/data/stats.dat") then
-        print("Sauvegarde des statistiques...")
-        local file = fs.open("/mobTower/data/stats.dat", "r")
-        if file then
-            savedStats = file.readAll()
-            file.close()
-        end
-    end
-    
+    -- Télécharger
     print("")
-    print("Telechargement des fichiers...")
+    print("Telechargement...")
     print("")
     
     local success = true
     local downloaded = 0
-    local failed = 0
     
     for _, fileInfo in ipairs(FILES) do
-        local url = BASE_URL .. fileInfo.path
+        local url = BASE_URL .. fileInfo.url
         local dest = fileInfo.dest
         
         write("  " .. dest .. " ... ")
@@ -170,61 +140,39 @@ local function install(update)
         else
             setColor(colors.red)
             print("ECHEC")
-            failed = failed + 1
             success = false
         end
         setColor(colors.white)
     end
     
-    -- Restaurer les données
-    if update and savedData then
-        local file = fs.open("/mobTower/data/config.dat", "w")
-        if file then
-            file.write(savedData)
-            file.close()
-        end
-    end
-    
-    if update and savedStats then
-        local file = fs.open("/mobTower/data/stats.dat", "w")
-        if file then
-            file.write(savedStats)
-            file.close()
-        end
-    end
-    
+    -- Résultat
     print("")
     print("============================================")
+    
     if success then
         setColor(colors.lime)
-        print("Installation terminee avec succes!")
-        print("")
+        print("Installation terminee!")
         setColor(colors.white)
-        print("Fichiers installes: " .. downloaded)
         print("")
-        print("Pour demarrer:")
+        print("Pour demarrer maintenant:")
         setColor(colors.cyan)
         print("  /mobTower/mobTower.lua")
         setColor(colors.white)
         print("")
         print("Le programme demarrera automatiquement")
-        print("au prochain redemarrage.")
-        
-        if not update then
-            print("")
-            setColor(colors.yellow)
-            print("Le Setup Wizard se lancera au premier")
-            print("demarrage pour configurer les peripheriques.")
-        end
+        print("au prochain reboot de l'ordinateur.")
+        print("")
+        setColor(colors.yellow)
+        print("Le Setup Wizard vous guidera pour")
+        print("configurer vos peripheriques.")
     else
         setColor(colors.red)
         print("Installation incomplete!")
         setColor(colors.white)
-        print("Fichiers telecharges: " .. downloaded)
-        print("Echecs: " .. failed)
+        print("Verifiez votre connexion internet.")
     end
-    setColor(colors.white)
     
+    setColor(colors.white)
     print("")
     print("Appuyez sur une touche...")
     os.pullEvent("key")
@@ -232,25 +180,24 @@ local function install(update)
     return success
 end
 
+-- Désinstallation
 local function uninstall()
     header()
-    
     setColor(colors.red)
     print("DESINSTALLATION")
     setColor(colors.white)
     print("")
-    print("Cela supprimera tous les fichiers.")
+    print("Cela supprimera tous les fichiers")
+    print("de Mob Tower Manager.")
     print("")
     setColor(colors.yellow)
-    print("Etes-vous sur? (o/n)")
+    print("Confirmer? (o/n)")
     setColor(colors.white)
     
     local confirm = read()
     if confirm:lower() ~= "o" then
         print("Annule.")
-        print("")
-        print("Appuyez sur une touche...")
-        os.pullEvent("key")
+        sleep(1)
         return
     end
     
@@ -268,7 +215,6 @@ local function uninstall()
         if file then
             local content = file.readAll()
             file.close()
-            
             if content:find("mobTower") then
                 fs.delete("/startup.lua")
                 print("  [OK] /startup.lua")
@@ -284,8 +230,12 @@ local function uninstall()
     os.pullEvent("key")
 end
 
+-- Main
 local function main()
     if not checkHTTP() then
+        print("")
+        print("Appuyez sur une touche...")
+        os.pullEvent("key")
         return
     end
     
@@ -293,39 +243,10 @@ local function main()
         local choice = mainMenu()
         
         if choice == 1 then
-            if fs.exists("/mobTower") then
-                header()
-                setColor(colors.yellow)
-                print("Une installation existe deja!")
-                print("La remplacer? (o/n)")
-                setColor(colors.white)
-                
-                local confirm = read()
-                if confirm:lower() == "o" then
-                    fs.delete("/mobTower")
-                    install(false)
-                end
-            else
-                install(false)
-            end
-            
+            install()
         elseif choice == 2 then
-            if not fs.exists("/mobTower") then
-                header()
-                setColor(colors.red)
-                print("Aucune installation trouvee!")
-                setColor(colors.white)
-                print("")
-                print("Appuyez sur une touche...")
-                os.pullEvent("key")
-            else
-                install(true)
-            end
-            
-        elseif choice == 3 then
             uninstall()
-            
-        elseif choice == 4 then
+        elseif choice == 3 then
             term.clear()
             term.setCursorPos(1, 1)
             print("Au revoir!")

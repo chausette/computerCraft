@@ -1,49 +1,58 @@
-# Mob Tower Manager v1.1
+# 🗼 Mob Tower Manager v1.1
 
 Un programme ComputerCraft pour gérer et automatiser votre tour à mobs.
 
-**Version 1.21 NeoForge** - Compatible avec CC: Tweaked + Advanced Peripherals
+**Compatible Minecraft 1.21.x NeoForge**
 
 ![Version](https://img.shields.io/badge/version-1.1-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x-green)
 ![Loader](https://img.shields.io/badge/Loader-NeoForge-orange)
 
-## Fonctionnalités
+---
 
-- 📊 **Dashboard temps réel** sur moniteur 3x2
-- 🔢 **Statistiques** : mobs tués (estimation), items collectés, temps actif
-- 📈 **Graphique de production** par heure (historique 12h)
+## ✨ Fonctionnalités
+
+- 📊 **Dashboard temps réel** sur moniteur
+- 🔢 **Statistiques** : mobs tués (estimation), items collectés
+- 📈 **Graphique de production** par heure
 - 📦 **Tri automatique** des drops vers les barils
-- ⚠️ **Alertes visuelles** pour items rares et stockage plein
-- 💡 **Contrôle du spawn** via redstone (lampes)
-- 👤 **Détection du joueur** avec Player Detector
-- 💾 **Sauvegarde persistante** des statistiques
-- 🧙 **Setup Wizard** pour configuration facile
+- ⚠️ **Alertes visuelles** pour items rares
+- 💡 **Contrôle du spawn** via redstone
+- 👤 **Détection du joueur** (optionnel)
+- 💾 **Sauvegarde automatique** des stats
 
-## Mods Requis
+---
 
-| Mod | Version | Téléchargement |
-|-----|---------|----------------|
-| CC: Tweaked | 1.21.1 | [Modrinth](https://modrinth.com/mod/cc-tweaked) |
-| Advanced Peripherals | 1.21.1 | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/advanced-peripherals) |
+## 📋 Mods Requis
 
-## Matériel Requis
+| Mod | Obligatoire | Téléchargement |
+|-----|-------------|----------------|
+| CC: Tweaked | ✅ Oui | [Modrinth](https://modrinth.com/mod/cc-tweaked) |
+| Advanced Peripherals | ❌ Optionnel | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/advanced-peripherals) |
+
+> Advanced Peripherals ajoute le **Player Detector** pour détecter ta présence.
+
+---
+
+## 🔧 Matériel Requis
 
 | Quantité | Item | Usage |
 |----------|------|-------|
 | 1 | Advanced Computer | Exécute le programme |
-| 1 | Monitor 3x2 | Affichage du dashboard |
-| 1 | Player Detector (AP) | Détecte ta présence |
+| 1 | Monitor (3x2 recommandé) | Affichage du dashboard |
+| 1 | Player Detector | Détecte ta présence (optionnel) |
 | 1 | Double Coffre | Coffre collecteur |
-| 23 | Barils | Stockage trié |
+| X | Barils | Stockage trié (1 par type d'item) |
 | - | Wired Modems | Connexion réseau |
 | - | Network Cables | Connexion réseau |
 
-## Installation
+---
+
+## 📥 Installation
 
 ### Méthode rapide (recommandée)
 
-Dans l'ordinateur ComputerCraft, exécutez :
+Dans l'ordinateur ComputerCraft, exécute :
 
 ```
 wget run https://raw.githubusercontent.com/chausette/computerCraft/master/mobTower/install.lua
@@ -51,61 +60,58 @@ wget run https://raw.githubusercontent.com/chausette/computerCraft/master/mobTow
 
 ### Méthode manuelle
 
-1. Téléchargez tous les fichiers du dossier `mobTower/`
-2. Placez-les dans le même dossier sur l'ordinateur
-3. Exécutez `mobTower/mobTower.lua`
+1. Crée le dossier :
+```
+mkdir /mobTower
+mkdir /mobTower/data
+```
 
-## Configuration
+2. Télécharge le programme :
+```
+wget https://raw.githubusercontent.com/chausette/computerCraft/master/mobTower/mobTower.lua /mobTower/mobTower.lua
+```
+
+3. (Optionnel) Pour l'auto-démarrage :
+```
+wget https://raw.githubusercontent.com/chausette/computerCraft/master/mobTower/startup.lua /startup.lua
+```
+
+4. Lance le programme :
+```
+/mobTower/mobTower.lua
+```
+
+---
+
+## ⚙️ Configuration
 
 ### Premier lancement
 
-Au premier lancement, le **Setup Wizard** vous guidera pour :
+Au premier lancement, le **Setup Wizard** te guidera pour :
 
-1. Sélectionner le Player Detector
-2. Sélectionner le moniteur
-3. Configurer la sortie redstone (côté + inversion)
-4. Sélectionner le coffre collecteur
-5. Attribuer chaque baril à un type d'item
+1. 👤 Entrer ton pseudo Minecraft
+2. 📡 Sélectionner le Player Detector (si disponible)
+3. 🖥️ Sélectionner le moniteur
+4. 🔴 Configurer le côté redstone pour les lampes
+5. 📦 Sélectionner le coffre collecteur
+6. 🗂️ Attribuer chaque baril à un type d'item
 
-### Configuration manuelle
+### Reconfigurer
 
-Vous pouvez modifier `mobTower/config.lua` directement :
+Appuie sur `C` dans le programme, puis `O` pour relancer le wizard.
 
-```lua
-local config = {
-    player = {
-        name = "VotrePseudo",
-        detectionRange = 16  -- Portée du Player Detector
-    },
-    
-    redstone = {
-        side = "back",       -- Côté de sortie redstone
-        inverted = false     -- Inverser le signal
-    },
-    
-    display = {
-        refreshRate = 1,     -- Rafraîchissement (secondes)
-        graphHours = 12,     -- Heures dans le graphique
-        alertDuration = 5    -- Durée des alertes (secondes)
-    },
-    
-    sorting = {
-        interval = 5,        -- Intervalle de tri (secondes)
-        enabled = true       -- Tri automatique actif
-    }
-}
-```
+---
 
-## Utilisation
+## 🎮 Utilisation
 
 ### Raccourcis clavier
 
 | Touche | Action |
 |--------|--------|
 | `S` | Toggle spawn ON/OFF |
-| `C` | Reconfigurer (relance le wizard) |
+| `C` | Reconfigurer |
 | `R` | Reset statistiques de session |
-| `Q` | Quitter le programme |
+| `Q` | Quitter |
 
 ### Interface du moniteur
 
@@ -117,26 +123,24 @@ local config = {
 │                      │ Max: ~847/h                 │
 │ Mobs session: ~1,247 │                             │
 │ Mobs total:  ~45,832 │ ▄▆█▇▅▃▆█▇▅▄▆█▇             │
-│                      │ -12h              now       │
+│                      │                             │
 │ Items session: 3,892 │                             │
 │ Items total: 142,847 │                             │
 │ Rares:             3 │                             │
 ├──────────────────────┼─────────────────────────────┤
 │ STOCKAGE             │ * ITEMS RARES               │
-│                      │                             │
 │ [████████░░░] 76%    │ > Zombie Head      14:32   │
-│                      │ > Diamond Sword    14:21   │
-│ > Rotten Flesh: 94%  │ > Iron Armor       13:58   │
+│ > Rotten Flesh: 94%  │ > Diamond Sword    14:21   │
 ├──────────────────────┴─────────────────────────────┤
 │ [S] Spawn  [C] Config  [R] Reset  [Q] Quitter      │
 └─────────────────────────────────────────────────────┘
 ```
 
-**Note :** Le symbole `~` indique une estimation (les mobs sont comptés via les drops).
+---
 
-### Comment fonctionne l'estimation des mobs
+## 📊 Comment fonctionne l'estimation des mobs
 
-Sans Entity Sensor (non disponible en 1.21), le programme estime les mobs tués en comptant les items collectés :
+Sans Entity Sensor (non disponible en 1.21), le programme **estime** les mobs tués à partir des drops collectés :
 
 | Item | Estimation |
 |------|------------|
@@ -144,101 +148,116 @@ Sans Entity Sensor (non disponible en 1.21), le programme estime les mobs tués 
 | 2 Bones | ~1 Skeleton |
 | 1 Gunpowder | ~1 Creeper |
 | 1 Ender Pearl | ~1 Enderman |
+| 2 String | ~1 Spider |
 
-### Items triés automatiquement
-
-**Drops de mobs :**
-- Rotten Flesh, Iron Ingot, Carrot, Potato (Zombie)
-- Bone, Arrow, Bow (Skeleton)
-- Gunpowder (Creeper/Witch)
-- Ender Pearl (Enderman)
-- Redstone, Glowstone, Sugar, Glass Bottle, Stick (Witch)
-
-**Équipements :**
-- Casques, Plastrons, Jambières, Bottes (toutes matières)
-- Épées, Arcs (enchantés ou non)
-
-**Items rares (avec alerte) :**
-- Têtes de mob
-- Music Discs
-- Équipements enchantés
-
-## Architecture des fichiers
-
-```
-mobTower/
-├── install.lua         # Installer/updater
-├── startup.lua         # Auto-démarrage
-├── mobTower.lua        # Programme principal
-├── config.lua          # Configuration
-├── lib/
-│   ├── ui.lua          # Interface graphique
-│   ├── peripherals.lua # Gestion périphériques
-│   ├── storage.lua     # Tri et inventaires
-│   └── utils.lua       # Fonctions utilitaires
-├── data/
-│   ├── stats.dat       # Statistiques sauvegardées
-│   └── debug.log       # Log de debug
-└── README.md           # Cette documentation
-```
-
-## Mise à jour
-
-Pour mettre à jour le programme :
-
-```
-wget run https://raw.githubusercontent.com/chausette/computerCraft/master/mobTower/install.lua
-```
-
-Puis choisissez l'option **2. Mise à jour**.
-
-Votre configuration et vos statistiques seront préservées.
-
-## Dépannage
-
-### "HTTP n'est pas active"
-
-Activez HTTP dans la config du mod :
-1. Ouvrez `config/computercraft-server.toml`
-2. Mettez `http_enable = true`
-3. Redémarrez le serveur
-
-### "Aucun Player Detector trouvé"
-
-- Vérifiez qu'Advanced Peripherals est installé
-- Vérifiez que le Player Detector est connecté avec un wired modem
-- Vérifiez que le modem est activé (clic droit)
-
-### Le tri ne fonctionne pas
-
-- Vérifiez que tous les barils ont un wired modem activé
-- Vérifiez que le coffre collecteur est bien configuré
-- Vérifiez les logs dans `mobTower/data/debug.log`
-
-### Les lampes ne répondent pas
-
-- Vérifiez le côté configuré pour la redstone
-- Essayez d'inverser le signal dans la config
-- Assurez-vous que la redstone est bien connectée aux lampes
-
-## Limitations (Version 1.21)
-
-⚠️ Cette version est adaptée pour Minecraft 1.21 où certains mods ne sont pas disponibles :
-
-- **Pas d'Entity Sensor** : Les mobs ne peuvent pas être comptés directement. Le programme estime les kills à partir des drops collectés.
-- **Pas de Redstone Integrator** : La redstone sort directement du computer (un seul côté disponible).
-
-## Crédits
-
-- **Auteur** : MikeChausette
-- **Mods utilisés** : 
-  - CC: Tweaked
-  - Advanced Peripherals
-
-## Licence
-
-Ce projet est open source. Utilisez-le, modifiez-le, partagez-le !
+C'est pourquoi les stats affichent `~` devant le nombre de mobs.
 
 ---
 
-*Créé avec ❤️ pour la communauté Minecraft*
+## 📦 Items triés automatiquement
+
+- **Zombie** : Rotten Flesh, Iron Ingot, Carrot, Potato
+- **Skeleton** : Bone, Arrow
+- **Creeper** : Gunpowder
+- **Enderman** : Ender Pearl
+- **Spider** : String, Spider Eye
+- **Witch** : Redstone, Glowstone, Sugar, Glass Bottle, Stick
+
+### Items rares (avec alerte)
+
+- 💀 Têtes de mob
+- 💿 Music Discs
+- ⚔️ Équipements enchantés
+
+---
+
+## 🔌 Connexion du matériel
+
+```
+                    ┌─────────────┐
+                    │   MONITOR   │
+                    │    3x2      │
+                    └──────┬──────┘
+                           │ (wired modem)
+    ┌──────────────────────┼──────────────────────┐
+    │                      │                      │
+┌───┴───┐            ┌─────┴─────┐          ┌─────┴─────┐
+│PLAYER │            │ ADVANCED  │          │  COFFRE   │
+│DETECT │            │ COMPUTER  │──────────│COLLECTEUR │
+└───────┘            └─────┬─────┘ redstone └───────────┘
+                           │
+                     ┌─────┴─────┐
+                     │  LAMPES   │
+                     │ (spawn)   │
+                     └───────────┘
+```
+
+1. Place des **wired modems** sur chaque périphérique
+2. Connecte-les avec des **network cables**
+3. **Clic droit** sur chaque modem pour l'activer (point rouge)
+4. Connecte la **redstone** du computer aux lampes de ta tour
+
+---
+
+## ❓ Dépannage
+
+### "HTTP n'est pas active"
+
+Active HTTP dans la config du mod :
+1. Ouvre `config/computercraft-server.toml`
+2. Trouve `http { enabled = false }`
+3. Change en `http { enabled = true }`
+4. Redémarre le serveur/jeu
+
+### "Aucun moniteur trouvé"
+
+- Vérifie que le wired modem est bien **activé** (point rouge visible)
+- Vérifie que le câble réseau connecte bien le computer au moniteur
+
+### Le tri ne fonctionne pas
+
+- Vérifie que tous les barils ont un wired modem **activé**
+- Vérifie que le coffre collecteur est bien configuré
+
+### Les lampes ne répondent pas
+
+- Vérifie le côté configuré pour la redstone
+- Essaie d'inverser le signal dans la config (touche C)
+
+---
+
+## 📁 Structure des fichiers
+
+```
+/mobTower/
+├── mobTower.lua    # Programme principal (tout-en-un)
+└── data/
+    ├── config.dat  # Configuration sauvegardée
+    └── stats.dat   # Statistiques sauvegardées
+
+/startup.lua        # Auto-démarrage (optionnel)
+```
+
+---
+
+## 📜 Changelog
+
+### v1.1 (1.21 NeoForge)
+- ✅ Compatible Minecraft 1.21.x
+- ✅ Utilise CC: Tweaked natif pour les inventaires
+- ✅ Player Detector optionnel (Advanced Peripherals)
+- ✅ Estimation des mobs via les drops
+- ✅ Version tout-en-un (un seul fichier)
+
+### v1.0
+- Version initiale pour Tom's Peripherals (incompatible 1.21)
+
+---
+
+## 📝 Licence
+
+Ce projet est open source. Utilise-le, modifie-le, partage-le !
+
+---
+
+*Créé par MikeChausette* 🧦
