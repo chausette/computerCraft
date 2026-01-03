@@ -148,7 +148,7 @@ function peripherals.listAll()
     
     for _, name in ipairs(all) do
         local pType = peripheral.getType(name)
-        if pType == "playerDetector" then
+        if pType == "playerDetector" or pType == "player_detector" then
             table.insert(result.playerDetectors, { name = name, type = pType })
         elseif pType == "monitor" then
             table.insert(result.monitors, { name = name, type = pType })
