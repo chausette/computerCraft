@@ -167,7 +167,7 @@ function Ambiance:update()
         if self.soundTimers[i] <= 0 then
             -- Joue le son
             local pitch = 0.8 + math.random() * 0.4 -- Variation de pitch
-            self.speakers:playSound(soundDef.sound, self.volume, pitch)
+            local played = self.speakers:playSound(soundDef.sound, self.volume, pitch)
             
             -- Reset le timer
             self.soundTimers[i] = math.random(soundDef.minDelay, soundDef.maxDelay)

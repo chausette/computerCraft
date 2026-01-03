@@ -93,28 +93,51 @@ if not fs.exists(MUSIC_PATH) then
     fs.makeDir(MUSIC_PATH)
 end
 
--- ============================================
--- LISTE DES DISQUES
--- ============================================
+-- Cree un fichier de test si aucun fichier n'existe
+local hasMusic = false
+if fs.exists(MUSIC_PATH) then
+    for _, file in ipairs(fs.list(MUSIC_PATH)) do
+        if string.match(file, "%.rcm$") then
+            hasMusic = true
+            break
+        end
+    end
+end
 
-local DISCS = {
-    {id = "13", name = "13", author = "C418"},
-    {id = "cat", name = "Cat", author = "C418"},
-    {id = "blocks", name = "Blocks", author = "C418"},
-    {id = "chirp", name = "Chirp", author = "C418"},
-    {id = "far", name = "Far", author = "C418"},
-    {id = "mall", name = "Mall", author = "C418"},
-    {id = "mellohi", name = "Mellohi", author = "C418"},
-    {id = "stal", name = "Stal", author = "C418"},
-    {id = "strad", name = "Strad", author = "C418"},
-    {id = "ward", name = "Ward", author = "C418"},
-    {id = "11", name = "11", author = "C418"},
-    {id = "wait", name = "Wait", author = "C418"},
-    {id = "pigstep", name = "Pigstep", author = "Lena Raine"},
-    {id = "otherside", name = "Otherside", author = "Lena Raine"},
-    {id = "5", name = "5", author = "Samuel Aberg"},
-    {id = "relic", name = "Relic", author = "Aaron Cherof"},
+if not hasMusic then
+    print("Creation d'une musique de test...")
+    local testMusic = [[
+return {
+  format = "rcm",
+  version = 1,
+  name = "Test Melody",
+  author = "RadioCraft",
+  bpm = 120,
+  duration = 80,
+  tracks = {
+    {
+      instrument = "harp",
+      notes = {
+        {t=0,p=6,v=1},{t=10,p=8,v=1},{t=20,p=10,v=1},{t=30,p=6,v=1},
+        {t=40,p=8,v=1},{t=50,p=10,v=1},{t=60,p=13,v=1},{t=70,p=13,v=1},
+      }
+    },
+    {
+      instrument = "bass",
+      notes = {
+        {t=0,p=6,v=0.8},{t=20,p=6,v=0.8},{t=40,p=8,v=0.8},{t=60,p=6,v=0.8},
+      }
+    }
+  }
 }
+]]
+    local f = fs.open(MUSIC_PATH .. "/test_melody.rcm", "w")
+    if f then
+        f.write(testMusic)
+        f.close()
+        print("Fichier test_melody.rcm cree!")
+    end
+end
 
 -- ============================================
 -- GESTION DES FICHIERS RCM
@@ -202,6 +225,7 @@ local function handleButton(buttonId, touchX, touchData)
     -- Tabs
     if buttonId == "tab_jukebox" then
         ui:setTab("jukebox")
+        rcmFiles = listRCMFiles()  -- Rafraichit la liste
     elseif buttonId == "tab_ambiance" then
         ui:setTab("ambiance")
     elseif buttonId == "tab_composer" then
@@ -209,12 +233,10 @@ local function handleButton(buttonId, touchX, touchData)
     elseif buttonId == "tab_settings" then
         ui:setTab("settings")
     
-    -- Sous-onglets Jukebox
-    elseif buttonId == "subtab_discs" then
-        ui.jukeboxSubTab = "discs"
-    elseif buttonId == "subtab_rcm" then
-        ui.jukeboxSubTab = "rcm"
-        rcmFiles = listRCMFiles()  -- Rafraichit la liste
+    -- Refresh liste RCM
+    elseif buttonId == "refresh_rcm" then
+        rcmFiles = listRCMFiles()
+        print("[RadioCraft] " .. #rcmFiles .. " musique(s) trouvee(s)")
     
     -- Controles de lecture
     elseif buttonId == "ctrl_play" then
@@ -275,12 +297,6 @@ local function handleButton(buttonId, touchX, touchData)
                 break
             end
         end
-    
-    -- Disques
-    elseif string.match(buttonId, "^disc_") then
-        local discId = buttonId:gsub("disc_", "")
-        player:playDisc(discId)
-        print("[RadioCraft] Lecture disque: " .. discId)
     
     -- Fichiers RCM
     elseif string.match(buttonId, "^rcm_") then

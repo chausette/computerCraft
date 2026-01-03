@@ -13,6 +13,7 @@ local VERSION_FILE = INSTALL_PATH .. "/.version"
 local FILES = {
     -- Programme principal
     {remote = "radiocraft/startup.lua", local_path = "/radiocraft/startup.lua"},
+    {remote = "radiocraft/diagnostic.lua", local_path = "/radiocraft/diagnostic.lua"},
     
     -- Bibliotheques
     {remote = "radiocraft/lib/speakers.lua", local_path = "/radiocraft/lib/speakers.lua"},
