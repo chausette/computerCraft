@@ -1,0 +1,34 @@
+-- RadioCraft Music File
+-- Exemple: Petite melodie de test
+return {
+  format = "rcm",
+  version = 1,
+  name = "Demo Melody",
+  author = "RadioCraft",
+  bpm = 120,
+  duration = 160,
+  tracks = {
+    {
+      instrument = "harp",
+      notes = {
+        {t=0,p=6,v=1},{t=10,p=6,v=1},{t=20,p=13,v=1},{t=30,p=13,v=1},
+        {t=40,p=15,v=1},{t=50,p=15,v=1},{t=60,p=13,v=1},
+        {t=80,p=11,v=1},{t=90,p=11,v=1},{t=100,p=10,v=1},{t=110,p=10,v=1},
+        {t=120,p=8,v=1},{t=130,p=8,v=1},{t=140,p=6,v=1},
+      }
+    },
+    {
+      instrument = "bass",
+      notes = {
+        {t=0,p=6,v=0.8},{t=20,p=6,v=0.8},{t=40,p=8,v=0.8},{t=60,p=6,v=0.8},
+        {t=80,p=4,v=0.8},{t=100,p=3,v=0.8},{t=120,p=1,v=0.8},{t=140,p=6,v=0.8},
+      }
+    },
+    {
+      instrument = "bell",
+      notes = {
+        {t=0,p=18,v=0.5},{t=40,p=20,v=0.5},{t=80,p=18,v=0.5},{t=120,p=18,v=0.5},
+      }
+    }
+  }
+}
