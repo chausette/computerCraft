@@ -84,6 +84,27 @@ function UI:button(x, y, w, h, text, id, active)
     })
 end
 
+-- Dessine une barre de progression cliquable pour le volume
+function UI:volumeBar(x, y, w, volume, id)
+    volume = volume or 1
+    local filled = math.floor(volume * w)
+    
+    self.monitor.setCursorPos(x, y)
+    self.monitor.setBackgroundColor(UI.COLORS.progress)
+    self.monitor.write(string.rep(" ", filled))
+    self.monitor.setBackgroundColor(UI.COLORS.progressBg)
+    self.monitor.write(string.rep(" ", w - filled))
+    self.monitor.setBackgroundColor(UI.COLORS.bg)
+    
+    -- Zone cliquable
+    table.insert(self.touchAreas, {
+        id = id or "volume_bar",
+        x1 = x, y1 = y,
+        x2 = x + w - 1, y2 = y,
+        data = {width = w}
+    })
+end
+
 -- Dessine une barre de progression
 function UI:progressBar(x, y, w, progress, max)
     max = max or 100
@@ -137,7 +158,7 @@ function UI:drawHeader()
 end
 
 -- Dessine le footer avec contrôles
-function UI:drawFooter(player)
+function UI:drawFooter(player, speakers)
     local y = self.height - 1
     
     self:rect(1, y, self.width, 2, UI.COLORS.muted)
@@ -164,11 +185,16 @@ function UI:drawFooter(player)
         })
     end
     
-    -- Volume
-    local volX = self.width - 10
-    self:text(volX, y, "Vol:", UI.COLORS.fg, UI.COLORS.muted)
-    local vol = player and player.speakers and player.speakers.masterVolume or 1
-    self:progressBar(volX + 4, y, 6, vol, 1)
+    -- Volume avec boutons - et +
+    local volX = self.width - 12
+    self:text(volX, y, "-", UI.COLORS.buttonText, UI.COLORS.button)
+    table.insert(self.buttons, {id = "vol_down", x1 = volX, y1 = y, x2 = volX, y2 = y})
+    
+    local vol = speakers and speakers.masterVolume or 1
+    self:volumeBar(volX + 2, y, 8, vol, "master_volume")
+    
+    self:text(volX + 10, y, "+", UI.COLORS.buttonText, UI.COLORS.button)
+    table.insert(self.buttons, {id = "vol_up", x1 = volX + 10, y1 = y, x2 = volX + 10, y2 = y})
     
     -- Now playing
     if player and player:getCurrentTrack() then
@@ -326,38 +352,94 @@ end
 function UI:drawSettings(speakers, player)
     local y = 4
     
-    self:text(2, y, "Speakers connectes:", UI.COLORS.accent)
+    -- Volume Master
+    self:text(2, y, "Volume Master:", UI.COLORS.accent)
+    self:text(17, y, "-", UI.COLORS.buttonText, UI.COLORS.button)
+    table.insert(self.buttons, {id = "master_vol_down", x1 = 17, y1 = y, x2 = 17, y2 = y})
+    
+    self:volumeBar(19, y, 10, speakers.masterVolume, "settings_master_vol")
+    
+    self:text(30, y, "+", UI.COLORS.buttonText, UI.COLORS.button)
+    table.insert(self.buttons, {id = "master_vol_up", x1 = 30, y1 = y, x2 = 30, y2 = y})
+    
+    self:text(32, y, string.format("%3d%%", math.floor(speakers.masterVolume * 100)), UI.COLORS.fg)
+    
+    y = y + 2
+    self:text(2, y, "Speakers connectes: " .. speakers:count(), UI.COLORS.accent)
     y = y + 1
     
     local speakerList = speakers:list()
     if #speakerList == 0 then
         self:text(2, y, "Aucun speaker trouve!", UI.COLORS.error)
+        y = y + 1
     else
-        for _, spk in ipairs(speakerList) do
-            self:text(2, y, string.format("- %s [%s]", spk.name, spk.zone), UI.COLORS.fg)
-            y = y + 1
+        local offset = self.scrollOffset.settings or 0
+        local maxVisible = math.min(5, #speakerList - offset)
+        
+        for i = 1, maxVisible do
+            local idx = i + offset
+            local spk = speakerList[idx]
+            if spk then
+                -- Nom du speaker
+                local displayName = spk.name
+                if #displayName > 15 then
+                    displayName = string.sub(displayName, 1, 12) .. "..."
+                end
+                self:text(2, y, displayName, UI.COLORS.fg)
+                
+                -- Zone actuelle
+                self:text(20, y, "[" .. (spk.zone or "default") .. "]", UI.COLORS.muted)
+                
+                -- Bouton pour changer de zone
+                self:rect(self.width - 10, y, 8, 1, UI.COLORS.button)
+                self:text(self.width - 9, y, "Zone", UI.COLORS.buttonText, UI.COLORS.button)
+                table.insert(self.buttons, {
+                    id = "speaker_zone_" .. idx,
+                    x1 = self.width - 10, y1 = y,
+                    x2 = self.width - 3, y2 = y,
+                    data = {speaker = spk.name}
+                })
+                
+                y = y + 1
+            end
         end
     end
     
     y = y + 1
-    self:text(2, y, "Zones:", UI.COLORS.accent)
+    self:text(2, y, "Zones configurees:", UI.COLORS.accent)
     y = y + 1
     
     local zones = speakers:listZones()
     for _, zone in ipairs(zones) do
-        self:text(2, y, string.format("%s: %d spk, vol %.0f%%", 
-            zone.name, zone.count, zone.volume * 100), UI.COLORS.fg)
+        self:text(2, y, string.format("%-10s %d spk", zone.name, zone.count), UI.COLORS.fg)
+        
+        -- Volume de la zone
+        self:text(20, y, "-", UI.COLORS.buttonText, UI.COLORS.button)
+        table.insert(self.buttons, {id = "zone_vol_down_" .. zone.name, x1 = 20, y1 = y, x2 = 20, y2 = y})
+        
+        self:volumeBar(22, y, 8, zone.volume, "zone_vol_" .. zone.name)
+        
+        self:text(31, y, "+", UI.COLORS.buttonText, UI.COLORS.button)
+        table.insert(self.buttons, {id = "zone_vol_up_" .. zone.name, x1 = 31, y1 = y, x2 = 31, y2 = y})
+        
+        self:text(33, y, string.format("%3d%%", math.floor(zone.volume * 100)), UI.COLORS.muted)
+        
         y = y + 1
     end
     
     y = y + 1
-    self:text(2, y, "Volume Master:", UI.COLORS.accent)
-    y = y + 1
-    self:progressBar(2, y, self.width - 4, speakers.masterVolume, 1)
+    
+    -- Boutons d'action
+    self:button(2, y, 12, 1, "Rafraichir", "refresh_speakers", false)
+    self:button(15, y, 12, 1, "Test son", "test_sound", false)
+    self:button(28, y, 12, 1, "Sauver", "save_config", false)
     
     y = y + 2
-    self:button(2, y, 15, 1, "Rafraichir", "refresh_speakers", false)
-    self:button(18, y, 15, 1, "Test son", "test_sound", false)
+    
+    -- Instructions
+    self:text(2, y, "Cliquez 'Zone' pour assigner un", UI.COLORS.muted)
+    y = y + 1
+    self:text(2, y, "speaker a une zone (salon, cave..)", UI.COLORS.muted)
 end
 
 -- Dessine tout l'écran
@@ -375,7 +457,7 @@ function UI:draw(player, ambiance, composer, speakers)
         self:drawSettings(speakers, player)
     end
     
-    self:drawFooter(player)
+    self:drawFooter(player, speakers)
     
     -- Reset colors
     self.monitor.setBackgroundColor(UI.COLORS.bg)

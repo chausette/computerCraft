@@ -85,6 +85,41 @@ wget run https://raw.githubusercontent.com/chausette/computerCraft/master/radio/
            (via wired modem)
 ```
 
+## 🔊 Gestion des Zones de Speakers
+
+Les zones permettent de grouper tes speakers et de contrôler leur volume séparément.
+
+### Configuration des zones
+
+1. Va dans l'onglet **CONFIG**
+2. Tu verras la liste de tes speakers connectés
+3. Clique sur **Zone** à côté d'un speaker
+4. Entre le nom de la zone (ex: `salon`, `cave`, `cuisine`)
+5. Clique sur **Sauver** pour garder la config
+
+### Exemple de configuration
+
+```
+Speaker 1 (speaker_0) -> Zone: salon
+Speaker 2 (speaker_1) -> Zone: salon  
+Speaker 3 (speaker_2) -> Zone: cave
+Speaker 4 (speaker_3) -> Zone: cuisine
+```
+
+Ensuite tu peux régler le volume de chaque zone indépendamment !
+
+### Contrôles clavier
+
+| Touche | Action |
+|--------|--------|
+| `Q` | Quitter |
+| `Space` | Play/Pause |
+| `S` | Stop |
+| `R` | Rafraîchir les speakers |
+| `T` | Test sonore |
+| `↑` | Volume + |
+| `↓` | Volume - |
+
 ## 🎮 Utilisation
 
 ### Lancer RadioCraft
@@ -110,15 +145,6 @@ startup
 │      ♫ Now Playing: Cat         │
 └─────────────────────────────────┘
 ```
-
-### Contrôles clavier
-
-| Touche | Action |
-|--------|--------|
-| `Q` | Quitter |
-| `Space` | Play/Pause |
-| `S` | Stop |
-| `R` | Rafraîchir les speakers |
 
 ## 🎹 Convertisseur MIDI
 

@@ -156,7 +156,10 @@ end
 -- GESTIONNAIRE D'EVENEMENTS
 -- ============================================
 
-local function handleButton(buttonId)
+-- Variable pour le dialogue de zone
+local zoneDialog = nil
+
+local function handleButton(buttonId, touchX, touchData)
     -- Tabs
     if buttonId == "tab_jukebox" then
         ui:setTab("jukebox")
@@ -181,26 +184,74 @@ local function handleButton(buttonId)
     elseif buttonId == "ctrl_repeat" then
         player:cycleRepeat()
     
+    -- Volume master (footer)
+    elseif buttonId == "vol_up" then
+        speakers:setMasterVolume(speakers.masterVolume + 0.1)
+    elseif buttonId == "vol_down" then
+        speakers:setMasterVolume(speakers.masterVolume - 0.1)
+    elseif buttonId == "master_volume" and touchX and touchData then
+        local newVol = touchX / touchData.width
+        speakers:setMasterVolume(newVol)
+    
+    -- Volume master (settings)
+    elseif buttonId == "master_vol_up" then
+        speakers:setMasterVolume(speakers.masterVolume + 0.1)
+    elseif buttonId == "master_vol_down" then
+        speakers:setMasterVolume(speakers.masterVolume - 0.1)
+    elseif buttonId == "settings_master_vol" and touchX and touchData then
+        local newVol = touchX / touchData.width
+        speakers:setMasterVolume(newVol)
+    
+    -- Volume des zones
+    elseif string.match(buttonId, "^zone_vol_up_") then
+        local zoneName = buttonId:gsub("zone_vol_up_", "")
+        local currentVol = speakers.zoneVolumes[zoneName] or 1
+        speakers:setZoneVolume(zoneName, currentVol + 0.1)
+    elseif string.match(buttonId, "^zone_vol_down_") then
+        local zoneName = buttonId:gsub("zone_vol_down_", "")
+        local currentVol = speakers.zoneVolumes[zoneName] or 1
+        speakers:setZoneVolume(zoneName, currentVol - 0.1)
+    elseif string.match(buttonId, "^zone_vol_") and touchX and touchData then
+        local zoneName = buttonId:gsub("zone_vol_", "")
+        local newVol = touchX / touchData.width
+        speakers:setZoneVolume(zoneName, newVol)
+    
+    -- Assignment de zone pour un speaker
+    elseif string.match(buttonId, "^speaker_zone_") then
+        local speakerList = speakers:list()
+        local idx = tonumber(buttonId:gsub("speaker_zone_", ""))
+        if idx and speakerList[idx] then
+            zoneDialog = {
+                speakerName = speakerList[idx].name,
+                currentZone = speakerList[idx].zone
+            }
+        end
+    
     -- Disques
     elseif string.match(buttonId, "^disc_") then
         local discId = buttonId:gsub("disc_", "")
         player:playDisc(discId)
+        print("[RadioCraft] Lecture: " .. discId)
     
     -- Stations d'ambiance
     elseif string.match(buttonId, "^station_") then
         local stationId = buttonId:gsub("station_", "")
         ambiance:toggle(stationId)
+        print("[RadioCraft] Ambiance: " .. stationId)
     
     -- Composer
     elseif buttonId == "comp_new" then
         composer:reset()
     elseif buttonId == "comp_save" then
-        -- Ouvre un dialogue simple
-        composer:saveToDisk(composer:getComposition().name)
+        local ok = composer:saveToDisk(composer:getComposition().name)
+        if ok then
+            print("[RadioCraft] Composition sauvegardee!")
+        end
     elseif buttonId == "comp_load" then
         local songs = composer:listDiskSongs()
         if #songs > 0 then
             composer:loadFromDisk(songs[1])
+            print("[RadioCraft] Composition chargee: " .. songs[1])
         end
     elseif buttonId == "comp_add_track" then
         composer:addTrack("harp")
@@ -210,10 +261,51 @@ local function handleButton(buttonId)
     
     -- Settings
     elseif buttonId == "refresh_speakers" then
-        speakers:discover()
+        local count = speakers:discover()
+        print("[RadioCraft] " .. count .. " speaker(s) detecte(s)")
     elseif buttonId == "test_sound" then
+        print("[RadioCraft] Test sonore...")
         speakers:playSound("minecraft:block.note_block.harp", 1, 1)
+        sleep(0.3)
+        speakers:playNote("harp", 1, 12)
+        sleep(0.3)
+        speakers:playNote("harp", 1, 16)
+        sleep(0.3)
+        speakers:playNote("harp", 1, 19)
+    elseif buttonId == "save_config" then
+        speakers:saveConfig(CONFIG_PATH)
+        print("[RadioCraft] Configuration sauvegardee!")
     end
+end
+
+-- Dialogue pour changer la zone d'un speaker
+local function handleZoneDialog()
+    if not zoneDialog then return end
+    
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("=== Assigner une zone ===")
+    print("")
+    print("Speaker: " .. zoneDialog.speakerName)
+    print("Zone actuelle: " .. (zoneDialog.currentZone or "default"))
+    print("")
+    print("Entrez le nom de la nouvelle zone")
+    print("(ex: salon, cave, cuisine...)")
+    print("ou appuyez sur Entree pour annuler:")
+    print("")
+    write("> ")
+    
+    local newZone = read()
+    
+    if newZone and newZone ~= "" then
+        speakers:setZone(zoneDialog.speakerName, newZone)
+        print("Zone changee: " .. newZone)
+    else
+        print("Annule")
+    end
+    
+    sleep(1)
+    zoneDialog = nil
 end
 
 -- ============================================
@@ -231,16 +323,22 @@ local tickInterval = 0.05 -- 20 ticks par seconde
 ui:draw(player, ambiance, composer, speakers)
 
 while running do
+    -- Gere le dialogue de zone si actif
+    if zoneDialog then
+        handleZoneDialog()
+        ui:draw(player, ambiance, composer, speakers)
+    end
+    
     -- Attend un evenement avec timeout
     local event, p1, p2, p3 = os.pullEvent()
     
     if event == "monitor_touch" then
         -- Clic sur le moniteur
         local x, y = p2, p3
-        local buttonId = ui:handleClick(x, y)
+        local buttonId, touchX, touchData = ui:handleClick(x, y)
         
         if buttonId then
-            handleButton(buttonId)
+            handleButton(buttonId, touchX, touchData)
             ui:draw(player, ambiance, composer, speakers)
         end
     
@@ -259,16 +357,26 @@ while running do
         elseif key == keys.r then
             speakers:discover()
             ui:draw(player, ambiance, composer, speakers)
+        elseif key == keys.t then
+            -- Test sonore avec T
+            print("[RadioCraft] Test sonore...")
+            speakers:playNote("harp", 1, 12)
+        elseif key == keys.up then
+            speakers:setMasterVolume(speakers.masterVolume + 0.1)
+            ui:draw(player, ambiance, composer, speakers)
+        elseif key == keys.down then
+            speakers:setMasterVolume(speakers.masterVolume - 0.1)
+            ui:draw(player, ambiance, composer, speakers)
         end
     
     elseif event == "disk" then
         -- Disquette inseree
-        print("Disquette detectee!")
+        print("[RadioCraft] Disquette detectee!")
         ui:draw(player, ambiance, composer, speakers)
     
     elseif event == "disk_eject" then
         -- Disquette retiree
-        print("Disquette retiree")
+        print("[RadioCraft] Disquette retiree")
         ui:draw(player, ambiance, composer, speakers)
     
     elseif event == "timer" or event == "alarm" then

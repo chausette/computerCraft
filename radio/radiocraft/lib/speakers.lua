@@ -17,6 +17,7 @@ function Speakers.new()
     self.zones = {}
     self.masterVolume = 1.0
     self.zoneVolumes = {}
+    self.debug = false
     self:discover()
     return self
 end
@@ -25,21 +26,38 @@ end
 function Speakers:discover()
     self.speakers = {}
     
-    -- Cherche les speakers directement attachés
+    -- Cherche les speakers directement attachés et via modem
     for _, name in ipairs(peripheral.getNames()) do
-        if peripheral.getType(name) == "speaker" then
-            table.insert(self.speakers, {
-                name = name,
-                peripheral = peripheral.wrap(name),
-                zone = "default"
-            })
+        local pType = peripheral.getType(name)
+        if pType == "speaker" then
+            local spk = peripheral.wrap(name)
+            if spk then
+                table.insert(self.speakers, {
+                    name = name,
+                    peripheral = spk,
+                    zone = "default"
+                })
+                if self.debug then
+                    print("[Speakers] Trouve: " .. name)
+                end
+            end
         end
     end
     
+    -- Initialise la zone par défaut
+    if not self.zoneVolumes["default"] then
+        self.zoneVolumes["default"] = 1.0
+    end
+    
     -- Log
-    print("[Speakers] " .. #self.speakers .. " speaker(s) trouvé(s)")
+    print("[Speakers] " .. #self.speakers .. " speaker(s) trouve(s)")
     
     return #self.speakers
+end
+
+-- Active/désactive le debug
+function Speakers:setDebug(enabled)
+    self.debug = enabled
 end
 
 -- Assigne un speaker à une zone
@@ -49,6 +67,9 @@ function Speakers:setZone(speakerName, zoneName)
             speaker.zone = zoneName
             if not self.zoneVolumes[zoneName] then
                 self.zoneVolumes[zoneName] = 1.0
+            end
+            if self.debug then
+                print("[Speakers] " .. speakerName .. " -> zone " .. zoneName)
             end
             return true
         end
@@ -77,14 +98,29 @@ function Speakers:playSound(sound, volume, pitch, zone)
     volume = volume or 1.0
     pitch = pitch or 1.0
     
+    local played = 0
+    
     for _, speaker in ipairs(self.speakers) do
         if zone == nil or speaker.zone == zone then
             local effectiveVol = volume * self:getEffectiveVolume(speaker.zone)
             if effectiveVol > 0 then
-                speaker.peripheral.playSound(sound, effectiveVol, pitch)
+                local ok, err = pcall(function()
+                    speaker.peripheral.playSound(sound, effectiveVol, pitch)
+                end)
+                if ok then
+                    played = played + 1
+                elseif self.debug then
+                    print("[Speakers] Erreur playSound: " .. tostring(err))
+                end
             end
         end
     end
+    
+    if self.debug then
+        print("[Speakers] playSound '" .. sound .. "' sur " .. played .. " speaker(s)")
+    end
+    
+    return played > 0
 end
 
 -- Joue une note sur tous les speakers (ou une zone spécifique)
@@ -105,20 +141,43 @@ function Speakers:playNote(instrument, volume, pitch, zone)
         instrument = "harp"
     end
     
+    -- Assure que pitch est dans la bonne plage (0-24)
+    pitch = math.max(0, math.min(24, pitch))
+    
+    local played = 0
+    
     for _, speaker in ipairs(self.speakers) do
         if zone == nil or speaker.zone == zone then
             local effectiveVol = volume * self:getEffectiveVolume(speaker.zone)
             if effectiveVol > 0 then
-                speaker.peripheral.playNote(instrument, effectiveVol, pitch)
+                local ok, err = pcall(function()
+                    speaker.peripheral.playNote(instrument, effectiveVol, pitch)
+                end)
+                if ok then
+                    played = played + 1
+                elseif self.debug then
+                    print("[Speakers] Erreur playNote: " .. tostring(err))
+                end
             end
         end
     end
+    
+    if self.debug then
+        print("[Speakers] playNote '" .. instrument .. "' pitch=" .. pitch .. " sur " .. played .. " speaker(s)")
+    end
+    
+    return played > 0
 end
 
 -- Stop tous les sons (si supporté)
 function Speakers:stopAll()
-    -- Note: les speakers CC ne supportent pas vraiment le stop
-    -- On peut juste arrêter d'envoyer des sons
+    for _, speaker in ipairs(self.speakers) do
+        pcall(function()
+            if speaker.peripheral.stop then
+                speaker.peripheral.stop()
+            end
+        end)
+    end
 end
 
 -- Liste tous les speakers
@@ -137,6 +196,8 @@ end
 function Speakers:listZones()
     local zones = {}
     local seen = {}
+    
+    -- D'abord, collecte toutes les zones des speakers
     for _, speaker in ipairs(self.speakers) do
         if not seen[speaker.zone] then
             seen[speaker.zone] = true
@@ -147,6 +208,19 @@ function Speakers:listZones()
             })
         end
     end
+    
+    -- Ajoute les zones configurées mais sans speaker
+    for zoneName, vol in pairs(self.zoneVolumes) do
+        if not seen[zoneName] then
+            seen[zoneName] = true
+            table.insert(zones, {
+                name = zoneName,
+                volume = vol,
+                count = 0
+            })
+        end
+    end
+    
     -- Compte les speakers par zone
     for _, speaker in ipairs(self.speakers) do
         for _, zone in ipairs(zones) do
@@ -155,6 +229,10 @@ function Speakers:listZones()
             end
         end
     end
+    
+    -- Trie par nom
+    table.sort(zones, function(a, b) return a.name < b.name end)
+    
     return zones
 end
 
@@ -175,8 +253,12 @@ function Speakers:saveConfig(path)
     end
     
     local file = fs.open(path, "w")
-    file.write(textutils.serialize(config))
-    file.close()
+    if file then
+        file.write(textutils.serialize(config))
+        file.close()
+        return true
+    end
+    return false
 end
 
 -- Charge la config des zones
@@ -184,6 +266,8 @@ function Speakers:loadConfig(path)
     if not fs.exists(path) then return false end
     
     local file = fs.open(path, "r")
+    if not file then return false end
+    
     local content = file.readAll()
     file.close()
     
