@@ -1,7 +1,7 @@
 -- ============================================
--- MOB TOWER MANAGER v1.2
+-- MOB TOWER MANAGER v1.3
 -- Version 1.21 NeoForge - TOUT EN UN
--- Avec boutons tactiles sur moniteur
+-- Avec wizard navigable et coffre overflow
 -- ============================================
 
 -- ============================================
@@ -165,6 +165,151 @@ function utils.ensureDir(path)
 end
 
 -- ============================================
+-- MENU NAVIGABLE (pour le wizard)
+-- ============================================
+
+local function navigableMenu(title, options, allowNone)
+    local selected = 1
+    local scroll = 0
+    local maxVisible = 10
+    local totalOptions = #options
+    
+    -- Ajouter option "Aucun" si permis
+    if allowNone then
+        table.insert(options, 1, { name = "[ Aucun / Passer ]", value = nil })
+        totalOptions = #options
+    end
+    
+    while true do
+        term.clear()
+        term.setCursorPos(1, 1)
+        
+        -- Titre
+        term.setTextColor(colors.cyan)
+        print(title)
+        print(string.rep("-", #title))
+        term.setTextColor(colors.white)
+        print("")
+        
+        -- Instructions
+        term.setTextColor(colors.lightGray)
+        print("Fleches: naviguer | Entree: selectionner")
+        print("")
+        term.setTextColor(colors.white)
+        
+        -- Afficher les options visibles
+        local startIdx = scroll + 1
+        local endIdx = math.min(scroll + maxVisible, totalOptions)
+        
+        -- Indicateur scroll haut
+        if scroll > 0 then
+            term.setTextColor(colors.gray)
+            print("  [...] " .. scroll .. " de plus en haut")
+            term.setTextColor(colors.white)
+        end
+        
+        for i = startIdx, endIdx do
+            local opt = options[i]
+            local prefix = (i == selected) and "> " or "  "
+            local displayName = opt.name or opt
+            
+            if type(displayName) == "table" then
+                displayName = displayName.name or tostring(displayName)
+            end
+            
+            -- Tronquer si trop long
+            if #displayName > 45 then
+                displayName = string.sub(displayName, 1, 42) .. "..."
+            end
+            
+            if i == selected then
+                term.setTextColor(colors.lime)
+                print(prefix .. displayName)
+                term.setTextColor(colors.white)
+            else
+                print(prefix .. displayName)
+            end
+        end
+        
+        -- Indicateur scroll bas
+        if endIdx < totalOptions then
+            term.setTextColor(colors.gray)
+            print("  [...] " .. (totalOptions - endIdx) .. " de plus en bas")
+            term.setTextColor(colors.white)
+        end
+        
+        -- Afficher info sélection
+        print("")
+        term.setTextColor(colors.yellow)
+        print("Selection: " .. selected .. "/" .. totalOptions)
+        term.setTextColor(colors.white)
+        
+        -- Attendre input
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            selected = selected - 1
+            if selected < 1 then selected = totalOptions end
+            -- Ajuster scroll
+            if selected < scroll + 1 then
+                scroll = selected - 1
+            end
+            if selected > scroll + maxVisible then
+                scroll = selected - maxVisible
+            end
+        elseif key == keys.down then
+            selected = selected + 1
+            if selected > totalOptions then selected = 1 end
+            -- Ajuster scroll
+            if selected > scroll + maxVisible then
+                scroll = selected - maxVisible
+            end
+            if selected < scroll + 1 then
+                scroll = selected - 1
+            end
+        elseif key == keys.pageUp then
+            selected = selected - maxVisible
+            if selected < 1 then selected = 1 end
+            scroll = math.max(0, selected - 1)
+        elseif key == keys.pageDown then
+            selected = selected + maxVisible
+            if selected > totalOptions then selected = totalOptions end
+            scroll = math.max(0, math.min(selected - maxVisible, totalOptions - maxVisible))
+        elseif key == keys.home then
+            selected = 1
+            scroll = 0
+        elseif key == keys["end"] then
+            selected = totalOptions
+            scroll = math.max(0, totalOptions - maxVisible)
+        elseif key == keys.enter then
+            local opt = options[selected]
+            if allowNone and selected == 1 then
+                return nil, nil
+            end
+            if type(opt) == "table" then
+                return opt.value or opt.name or opt, selected
+            end
+            return opt, selected
+        end
+    end
+end
+
+-- Menu pour sélectionner un inventaire
+local function selectInventory(title, inventories, allowNone)
+    local options = {}
+    for i, inv in ipairs(inventories) do
+        table.insert(options, {
+            name = inv.name .. " (" .. inv.size .. " slots)",
+            value = inv.name,
+            index = i
+        })
+    end
+    
+    local result, idx = navigableMenu(title, options, allowNone)
+    return result, idx
+end
+
+-- ============================================
 -- PERIPHERALS
 -- ============================================
 
@@ -209,6 +354,10 @@ function peripherals.listAll()
             table.insert(result.other, { name = name, type = pType })
         end
     end
+    
+    -- Trier les inventaires par nom
+    table.sort(result.inventories, function(a, b) return a.name < b.name end)
+    
     return result
 end
 
@@ -275,15 +424,6 @@ function peripherals.getMonitorSize()
     return pCache.monitor.getSize()
 end
 
-function peripherals.getMonitorName()
-    for _, name in ipairs(peripheral.getNames()) do
-        if peripheral.getType(name) == "monitor" then
-            return name
-        end
-    end
-    return nil
-end
-
 -- ============================================
 -- STORAGE
 -- ============================================
@@ -291,6 +431,7 @@ end
 local storage = {}
 local sortingRules = {}
 local collectorChest = nil
+local overflowChest = nil  -- NOUVEAU: coffre pour items non triés
 local stats = {
     session = { startTime = 0, mobsKilled = 0, itemsCollected = 0, raresFound = 0 },
     total = { mobsKilled = 0, itemsCollected = 0, raresFound = 0, totalTime = 0 },
@@ -315,6 +456,7 @@ local MOB_ESTIMATES = {
 
 function storage.init(config)
     collectorChest = config.storage.collectorChest
+    overflowChest = config.storage.overflowChest  -- NOUVEAU
     sortingRules = config.storage.sortingRules or {}
     storage.loadStats()
     stats.session.startTime = os.epoch("utc") / 1000
@@ -412,7 +554,8 @@ function storage.findDestination(itemName)
             if itemName == rule.itemId then return rule.barrel end
         end
     end
-    return nil
+    -- NOUVEAU: retourner le coffre overflow si configuré
+    return overflowChest
 end
 
 function storage.sortSlot(slot, item)
@@ -456,6 +599,8 @@ end
 
 function storage.getStorageStatus()
     local status = { total = { capacity = 0, used = 0, percent = 0 }, barrels = {}, warnings = {} }
+    
+    -- Vérifier les barils de tri
     for _, rule in ipairs(sortingRules) do
         local percent = peripherals.getFillPercent(rule.barrel)
         status.total.capacity = status.total.capacity + 100
@@ -466,13 +611,24 @@ function storage.getStorageStatus()
             table.insert(status.warnings, { level = "warning", item = utils.getShortName(rule.itemId), percent = percent })
         end
     end
+    
+    -- Vérifier le coffre overflow
+    if overflowChest then
+        local percent = peripherals.getFillPercent(overflowChest)
+        status.total.capacity = status.total.capacity + 100
+        status.total.used = status.total.used + percent
+        if percent >= 100 then
+            table.insert(status.warnings, { level = "critical", item = "Overflow", percent = percent })
+        elseif percent >= 80 then
+            table.insert(status.warnings, { level = "warning", item = "Overflow", percent = percent })
+        end
+    end
+    
     if status.total.capacity > 0 then
         status.total.percent = math.floor(status.total.used / status.total.capacity * 100)
     end
     return status
 end
-
-function storage.recordHourlyStats() end
 
 -- ============================================
 -- UI avec BOUTONS TACTILES
@@ -483,8 +639,6 @@ local monitor = nil
 local monitorName = nil
 local width, height = 0, 0
 local alertState = { active = false, message = "", startTime = 0, duration = 3 }
-
--- Définition des boutons
 local buttons = {}
 
 local theme = {
@@ -570,45 +724,28 @@ function ui.drawBarGraph(x, y, w, h, data, maxValue)
     monitor.setBackgroundColor(theme.bg)
 end
 
--- Dessiner un bouton et l'enregistrer pour le clic
 function ui.drawButton(x, y, w, h, text, id, active)
     if not monitor then return end
-    
     local bgColor = active and theme.buttonActive or theme.buttonBg
     local fgColor = active and theme.bg or theme.buttonText
-    
-    -- Dessiner le fond du bouton
     for dy = 0, h - 1 do
         monitor.setCursorPos(x, y + dy)
         monitor.setBackgroundColor(bgColor)
         monitor.write(string.rep(" ", w))
     end
-    
-    -- Centrer le texte
     local textX = x + math.floor((w - #text) / 2)
     local textY = y + math.floor(h / 2)
     monitor.setCursorPos(textX, textY)
     monitor.setTextColor(fgColor)
     monitor.setBackgroundColor(bgColor)
     monitor.write(text)
-    
-    -- Enregistrer le bouton pour la détection de clic
-    table.insert(buttons, {
-        id = id,
-        x1 = x,
-        y1 = y,
-        x2 = x + w - 1,
-        y2 = y + h - 1
-    })
-    
+    table.insert(buttons, { id = id, x1 = x, y1 = y, x2 = x + w - 1, y2 = y + h - 1 })
     monitor.setBackgroundColor(theme.bg)
 end
 
--- Vérifier si un clic touche un bouton
 function ui.checkButtonClick(clickX, clickY)
     for _, btn in ipairs(buttons) do
-        if clickX >= btn.x1 and clickX <= btn.x2 and
-           clickY >= btn.y1 and clickY <= btn.y2 then
+        if clickX >= btn.x1 and clickX <= btn.x2 and clickY >= btn.y1 and clickY <= btn.y2 then
             return btn.id
         end
     end
@@ -624,7 +761,6 @@ function ui.drawHeader(title, spawnOn, sessionTime)
     monitor.setCursorPos(2, 1)
     monitor.write("# " .. title)
     
-    -- Bouton SPAWN (cliquable)
     local btnText = spawnOn and " ON " or " OFF"
     local btnX = math.floor(width / 2) - 3
     ui.drawButton(btnX, 1, 6, 1, btnText, "spawn", spawnOn)
@@ -693,7 +829,7 @@ function ui.drawStorage(x, y, storageStatus)
     y = y + 2
     local warningCount = 0
     for _, warning in ipairs(storageStatus.warnings) do
-        if warningCount >= 2 then break end
+        if warningCount >= 3 then break end
         local icon = warning.level == "critical" and "!" or ">"
         local color = warning.level == "critical" and theme.danger or theme.warning
         ui.writeLine(x, y, icon .. " " .. utils.truncate(warning.item, 12) .. ": " .. warning.percent .. "%", color)
@@ -724,12 +860,9 @@ function ui.drawFooter(y)
     if not monitor then return end
     ui.drawLine(y, "-", theme.border)
     y = y + 1
-    
-    -- Boutons cliquables en bas
     local btnWidth = 10
     local spacing = 2
     local startX = 2
-    
     ui.drawButton(startX, y, btnWidth, 1, "CONFIG", "config", false)
     ui.drawButton(startX + btnWidth + spacing, y, btnWidth, 1, "RESET", "reset", false)
     ui.drawButton(startX + (btnWidth + spacing) * 2, y, btnWidth, 1, "QUITTER", "quit", false)
@@ -738,7 +871,7 @@ end
 function ui.drawMainScreen(data)
     if not monitor then return end
     ui.clear()
-    ui.drawHeader("MOB TOWER v1.2", data.spawnOn, data.sessionTime)
+    ui.drawHeader("MOB TOWER v1.3", data.spawnOn, data.sessionTime)
     ui.drawLine(2)
     local leftCol = 2
     local rightCol = math.floor(width / 2) + 2
@@ -787,20 +920,16 @@ function ui.drawAlert()
     monitor.setBackgroundColor(theme.bg)
 end
 
-function ui.getMonitorName()
-    return monitorName
-end
-
 -- ============================================
 -- CONFIGURATION
 -- ============================================
 
 local config = {
-    version = "1.2",
+    version = "1.3",
     player = { name = "MikeChausette", detectionRange = 16 },
     peripherals = { playerDetector = nil, monitor = nil },
     redstone = { side = "back", inverted = false },
-    storage = { collectorChest = nil, sortingRules = {} },
+    storage = { collectorChest = nil, overflowChest = nil, sortingRules = {} },
     display = { refreshRate = 1, graphHours = 12, rareItemsCount = 5, alertDuration = 5 },
     sorting = { interval = 5, enabled = true },
     setupComplete = false
@@ -809,159 +938,225 @@ local config = {
 local CONFIG_FILE = "/mobTower/data/config.dat"
 
 -- ============================================
--- SETUP WIZARD
+-- SETUP WIZARD AMELIORE
 -- ============================================
 
 local function setupWizard()
     term.clear()
     term.setCursorPos(1, 1)
     
+    term.setTextColor(colors.cyan)
     print("============================================")
-    print("   MOB TOWER MANAGER v1.2 - Setup Wizard")
-    print("   Version 1.21 NeoForge")
+    print("   MOB TOWER MANAGER v1.3 - Setup Wizard")
     print("============================================")
+    term.setTextColor(colors.white)
     print("")
+    print("Navigation: Fleches haut/bas, Entree")
+    print("PageUp/PageDown pour aller plus vite")
+    print("")
+    print("Appuyez sur une touche pour commencer...")
+    os.pullEvent("key")
     
     -- Nom du joueur
-    print("[1/6] Quel est ton pseudo Minecraft?")
-    write("  Pseudo [" .. config.player.name .. "]: ")
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.setTextColor(colors.cyan)
+    print("[1/8] Pseudo Minecraft")
+    term.setTextColor(colors.white)
+    print("")
+    write("Ton pseudo [" .. config.player.name .. "]: ")
     local playerName = read()
     if playerName and #playerName > 0 then config.player.name = playerName end
-    print("  -> " .. config.player.name)
     
     -- Scan
-    print("")
-    print("[2/6] Scan des peripheriques...")
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.setTextColor(colors.cyan)
+    print("[2/8] Scan des peripheriques...")
+    term.setTextColor(colors.white)
     sleep(0.5)
     local allPeripherals = peripherals.listAll()
+    print("")
+    print("Trouves:")
+    print("  - " .. #allPeripherals.playerDetectors .. " Player Detector(s)")
+    print("  - " .. #allPeripherals.monitors .. " Moniteur(s)")
+    print("  - " .. #allPeripherals.inventories .. " Inventaire(s)")
+    print("")
+    print("Appuyez sur une touche...")
+    os.pullEvent("key")
     
     -- Player Detector
-    print("")
-    print("[3/6] Player Detector")
-    if #allPeripherals.playerDetectors == 0 then
-        print("  Aucun trouve (optionnel)")
+    if #allPeripherals.playerDetectors > 0 then
+        local options = {}
+        for _, det in ipairs(allPeripherals.playerDetectors) do
+            table.insert(options, { name = det.name, value = det.name })
+        end
+        local result = navigableMenu("[3/8] Choisir le Player Detector", options, true)
+        config.peripherals.playerDetector = result
     else
-        for i, det in ipairs(allPeripherals.playerDetectors) do
-            print("  " .. i .. ". " .. det.name)
-        end
-        print("  0. Aucun")
-        write("  Choix: ")
-        local choice = tonumber(read())
-        if choice and choice > 0 and allPeripherals.playerDetectors[choice] then
-            config.peripherals.playerDetector = allPeripherals.playerDetectors[choice].name
-            print("  -> " .. config.peripherals.playerDetector)
-        else
-            print("  -> Aucun")
-        end
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.setTextColor(colors.yellow)
+        print("[3/8] Aucun Player Detector trouve")
+        term.setTextColor(colors.white)
+        print("(Optionnel - continue sans)")
+        sleep(1)
     end
     
     -- Monitor
-    print("")
-    print("[4/6] Moniteur")
     if #allPeripherals.monitors == 0 then
-        print("  ERREUR: Aucun moniteur!")
+        term.clear()
+        term.setTextColor(colors.red)
+        print("ERREUR: Aucun moniteur trouve!")
+        term.setTextColor(colors.white)
         return false
     end
-    for i, mon in ipairs(allPeripherals.monitors) do
-        print("  " .. i .. ". " .. mon.name)
+    local monOptions = {}
+    for _, mon in ipairs(allPeripherals.monitors) do
+        table.insert(monOptions, { name = mon.name, value = mon.name })
     end
-    write("  Choix: ")
-    local choice = tonumber(read())
-    if choice and allPeripherals.monitors[choice] then
-        config.peripherals.monitor = allPeripherals.monitors[choice].name
-        print("  -> " .. config.peripherals.monitor)
-    else
-        print("  ERREUR: Choix invalide!")
-        return false
-    end
+    local monResult = navigableMenu("[4/8] Choisir le Moniteur", monOptions, false)
+    if not monResult then return false end
+    config.peripherals.monitor = monResult
     
     -- Redstone
-    print("")
-    print("[5/6] Cote redstone pour lampes")
-    local sides = {"top", "bottom", "left", "right", "front", "back"}
-    for i, side in ipairs(sides) do print("  " .. i .. ". " .. side) end
-    print("  0. Aucun (pas de controle lampes)")
-    write("  Choix [0-6]: ")
-    choice = tonumber(read())
-    if choice and choice > 0 and sides[choice] then
-        config.redstone.side = sides[choice]
-        print("  -> " .. config.redstone.side)
-        
-        print("  Inverser signal? (o/n)")
+    local sideOptions = {}
+    for _, side in ipairs(utils.SIDES) do
+        table.insert(sideOptions, { name = side, value = side })
+    end
+    local sideResult = navigableMenu("[5/8] Cote redstone (lampes)", sideOptions, true)
+    if sideResult then
+        config.redstone.side = sideResult
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.setTextColor(colors.cyan)
+        print("Inverser le signal redstone?")
+        term.setTextColor(colors.white)
+        print("")
+        print("Normal: signal OFF = lampes eteintes = spawn ON")
+        print("Inverse: signal ON = lampes eteintes = spawn ON")
+        print("")
+        print("(o)ui / (n)on")
         local inv = read()
         config.redstone.inverted = (inv:lower() == "o")
     else
-        print("  -> Pas de controle lampes")
         config.redstone.side = nil
     end
     
     -- Coffre collecteur
-    print("")
-    print("[6/6] Coffre collecteur")
     if #allPeripherals.inventories == 0 then
-        print("  Aucun inventaire trouve!")
-        print("  Continuez sans tri automatique.")
-    else
-        for i, inv in ipairs(allPeripherals.inventories) do
-            print("  " .. i .. ". " .. inv.name .. " (" .. inv.size .. " slots)")
+        term.clear()
+        term.setTextColor(colors.red)
+        print("ERREUR: Aucun inventaire trouve!")
+        term.setTextColor(colors.white)
+        return false
+    end
+    
+    local collectorResult = selectInventory("[6/8] Coffre COLLECTEUR (entree des items)", allPeripherals.inventories, false)
+    if not collectorResult then return false end
+    config.storage.collectorChest = collectorResult
+    
+    -- Retirer le collecteur de la liste
+    local remainingInv = {}
+    for _, inv in ipairs(allPeripherals.inventories) do
+        if inv.name ~= config.storage.collectorChest then
+            table.insert(remainingInv, inv)
         end
-        print("  0. Aucun (pas de tri)")
-        write("  Choix: ")
-        choice = tonumber(read())
-        if choice and choice > 0 and allPeripherals.inventories[choice] then
-            config.storage.collectorChest = allPeripherals.inventories[choice].name
-            print("  -> " .. config.storage.collectorChest)
-            
-            -- Attribution des barils
-            print("")
-            print("Attribution des barils (Entree = passer)")
-            print("Conseil: ne configure que les items que")
-            print("tu veux trier!")
-            print("")
-            
-            local remaining = {}
-            for _, inv in ipairs(allPeripherals.inventories) do
-                if inv.name ~= config.storage.collectorChest then
-                    table.insert(remaining, inv)
-                end
+    end
+    
+    -- Coffre overflow (NOUVEAU)
+    local overflowResult = selectInventory("[7/8] Coffre OVERFLOW (items non tries)", remainingInv, true)
+    config.storage.overflowChest = overflowResult
+    
+    -- Retirer l'overflow de la liste
+    if overflowResult then
+        local temp = {}
+        for _, inv in ipairs(remainingInv) do
+            if inv.name ~= overflowResult then
+                table.insert(temp, inv)
             end
-            
-            for _, item in ipairs(utils.SORTABLE_ITEMS) do
-                if #remaining == 0 then break end
-                print("")
-                print("  " .. item.name)
-                for i, inv in ipairs(remaining) do
-                    if i <= 5 then print("    " .. i .. ". " .. inv.name) end
-                end
-                if #remaining > 5 then print("    ... +" .. (#remaining - 5) .. " autres") end
-                write("  Choix [0=passer]: ")
-                choice = tonumber(read())
-                if choice and choice > 0 and remaining[choice] then
-                    table.insert(config.storage.sortingRules, {
-                        itemId = item.id,
-                        barrel = remaining[choice].name,
-                        pattern = item.pattern or false
-                    })
-                    print("    -> " .. remaining[choice].name)
-                    table.remove(remaining, choice)
-                end
-            end
+        end
+        remainingInv = temp
+    end
+    
+    -- Attribution des barils
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.setTextColor(colors.cyan)
+    print("[8/8] Attribution des barils de tri")
+    term.setTextColor(colors.white)
+    print("")
+    print("Pour chaque item, choisissez un baril.")
+    print("Les items non configures iront dans")
+    if config.storage.overflowChest then
+        print("le coffre overflow: " .. config.storage.overflowChest)
+    else
+        print("AUCUN coffre (resteront dans collecteur)")
+    end
+    print("")
+    print("Barils disponibles: " .. #remainingInv)
+    print("")
+    print("Appuyez sur une touche...")
+    os.pullEvent("key")
+    
+    config.storage.sortingRules = {}
+    
+    for _, item in ipairs(utils.SORTABLE_ITEMS) do
+        if #remainingInv == 0 then
+            term.clear()
+            term.setTextColor(colors.yellow)
+            print("Plus de barils disponibles!")
+            term.setTextColor(colors.white)
+            sleep(1)
+            break
+        end
+        
+        local barrelResult, idx = selectInventory(
+            "Baril pour: " .. item.name .. " (" .. #remainingInv .. " dispo)",
+            remainingInv,
+            true
+        )
+        
+        if barrelResult then
+            table.insert(config.storage.sortingRules, {
+                itemId = item.id,
+                barrel = barrelResult,
+                pattern = item.pattern or false
+            })
+            -- Retirer le baril utilisé
+            table.remove(remainingInv, idx - 1)  -- -1 car on a ajouté "Aucun" en position 1
         end
     end
     
     -- Sauvegarde
-    print("")
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.setTextColor(colors.lime)
     print("============================================")
+    print("   Configuration terminee!")
+    print("============================================")
+    term.setTextColor(colors.white)
+    print("")
+    print("Resume:")
+    print("  Joueur: " .. config.player.name)
+    print("  Player Detector: " .. (config.peripherals.playerDetector or "Non"))
+    print("  Moniteur: " .. config.peripherals.monitor)
+    print("  Redstone: " .. (config.redstone.side or "Non"))
+    print("  Collecteur: " .. config.storage.collectorChest)
+    print("  Overflow: " .. (config.storage.overflowChest or "Non"))
+    print("  Regles de tri: " .. #config.storage.sortingRules)
+    print("")
+    
     config.setupComplete = true
     utils.ensureDir("/mobTower/data")
     utils.saveTable(CONFIG_FILE, config)
-    print("Configuration sauvegardee!")
-    print("Regles de tri: " .. #config.storage.sortingRules)
-    print("")
+    
+    term.setTextColor(colors.yellow)
     print("CONSEIL: Touchez le moniteur pour")
-    print("interagir avec l'interface!")
+    print("interagir avec les boutons!")
+    term.setTextColor(colors.white)
     print("")
-    print("Appuyez sur une touche...")
+    print("Appuyez sur une touche pour demarrer...")
     os.pullEvent("key")
     
     return true
@@ -1080,7 +1275,6 @@ local function mainLoop()
             if event == "timer" and p1 == timer then
                 break
             elseif event == "monitor_touch" then
-                -- p1 = monitor name, p2 = x, p3 = y
                 if p1 == config.peripherals.monitor then
                     os.cancelTimer(timer)
                     handleMonitorTouch(p2, p3)
@@ -1088,7 +1282,6 @@ local function mainLoop()
                 end
             elseif event == "key" then
                 os.cancelTimer(timer)
-                -- Raccourcis clavier (si terminal actif)
                 if p1 == keys.q then
                     running = false
                 elseif p1 == keys.s then
@@ -1116,7 +1309,9 @@ end
 
 term.clear()
 term.setCursorPos(1, 1)
-print("Mob Tower Manager v1.2")
+term.setTextColor(colors.cyan)
+print("Mob Tower Manager v1.3")
+term.setTextColor(colors.white)
 print("Chargement...")
 
 if not initialize() then
@@ -1126,19 +1321,18 @@ end
 
 term.clear()
 term.setCursorPos(1, 1)
-print("Mob Tower Manager v1.2 actif!")
+term.setTextColor(colors.lime)
+print("Mob Tower Manager v1.3 actif!")
+term.setTextColor(colors.white)
 print("")
 print(">>> TOUCHEZ LE MONITEUR <<<")
 print("pour interagir avec l'interface")
 print("")
-print("Boutons disponibles:")
+print("Boutons:")
 print("  - ON/OFF : Toggle lampes")
 print("  - CONFIG : Reconfigurer")
 print("  - RESET  : Reset stats")
 print("  - QUITTER: Arreter")
-print("")
-print("Raccourcis clavier (si terminal actif):")
-print("  S=Spawn C=Config R=Reset Q=Quitter")
 
 pcall(mainLoop)
 storage.saveStats()
