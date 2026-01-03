@@ -79,36 +79,37 @@ end
 
 -- Joue un disque vanilla
 function Player:playDisc(discName)
-    -- Liste des disques Minecraft
+    -- Liste des disques Minecraft avec le bon format de son
     local discs = {
-        ["minecraft:music_disc_13"] = {name = "13", author = "C418", duration = 178*20},
-        ["minecraft:music_disc_cat"] = {name = "Cat", author = "C418", duration = 185*20},
-        ["minecraft:music_disc_blocks"] = {name = "Blocks", author = "C418", duration = 345*20},
-        ["minecraft:music_disc_chirp"] = {name = "Chirp", author = "C418", duration = 185*20},
-        ["minecraft:music_disc_far"] = {name = "Far", author = "C418", duration = 174*20},
-        ["minecraft:music_disc_mall"] = {name = "Mall", author = "C418", duration = 197*20},
-        ["minecraft:music_disc_mellohi"] = {name = "Mellohi", author = "C418", duration = 96*20},
-        ["minecraft:music_disc_stal"] = {name = "Stal", author = "C418", duration = 150*20},
-        ["minecraft:music_disc_strad"] = {name = "Strad", author = "C418", duration = 188*20},
-        ["minecraft:music_disc_ward"] = {name = "Ward", author = "C418", duration = 251*20},
-        ["minecraft:music_disc_11"] = {name = "11", author = "C418", duration = 71*20},
-        ["minecraft:music_disc_wait"] = {name = "Wait", author = "C418", duration = 238*20},
-        ["minecraft:music_disc_otherside"] = {name = "Otherside", author = "Lena Raine", duration = 195*20},
-        ["minecraft:music_disc_5"] = {name = "5", author = "Samuel Åberg", duration = 178*20},
-        ["minecraft:music_disc_pigstep"] = {name = "Pigstep", author = "Lena Raine", duration = 149*20},
-        ["minecraft:music_disc_relic"] = {name = "Relic", author = "Aaron Cherof", duration = 218*20},
+        ["13"] = {name = "13", author = "C418", duration = 178*20, sound = "minecraft:music_disc.13"},
+        ["cat"] = {name = "Cat", author = "C418", duration = 185*20, sound = "minecraft:music_disc.cat"},
+        ["blocks"] = {name = "Blocks", author = "C418", duration = 345*20, sound = "minecraft:music_disc.blocks"},
+        ["chirp"] = {name = "Chirp", author = "C418", duration = 185*20, sound = "minecraft:music_disc.chirp"},
+        ["far"] = {name = "Far", author = "C418", duration = 174*20, sound = "minecraft:music_disc.far"},
+        ["mall"] = {name = "Mall", author = "C418", duration = 197*20, sound = "minecraft:music_disc.mall"},
+        ["mellohi"] = {name = "Mellohi", author = "C418", duration = 96*20, sound = "minecraft:music_disc.mellohi"},
+        ["stal"] = {name = "Stal", author = "C418", duration = 150*20, sound = "minecraft:music_disc.stal"},
+        ["strad"] = {name = "Strad", author = "C418", duration = 188*20, sound = "minecraft:music_disc.strad"},
+        ["ward"] = {name = "Ward", author = "C418", duration = 251*20, sound = "minecraft:music_disc.ward"},
+        ["11"] = {name = "11", author = "C418", duration = 71*20, sound = "minecraft:music_disc.11"},
+        ["wait"] = {name = "Wait", author = "C418", duration = 238*20, sound = "minecraft:music_disc.wait"},
+        ["otherside"] = {name = "Otherside", author = "Lena Raine", duration = 195*20, sound = "minecraft:music_disc.otherside"},
+        ["5"] = {name = "5", author = "Samuel Åberg", duration = 178*20, sound = "minecraft:music_disc.5"},
+        ["pigstep"] = {name = "Pigstep", author = "Lena Raine", duration = 149*20, sound = "minecraft:music_disc.pigstep"},
+        ["relic"] = {name = "Relic", author = "Aaron Cherof", duration = 218*20, sound = "minecraft:music_disc.relic"},
     }
     
-    local soundName = discName
-    if not string.find(discName, ":") then
-        soundName = "minecraft:music_disc." .. discName
-    end
+    -- Nettoie le nom du disque
+    local cleanName = discName:lower():gsub("minecraft:music_disc.", ""):gsub("minecraft:music_disc_", "")
     
-    local discInfo = discs[soundName] or {name = discName, author = "Unknown", duration = 180*20}
+    local discInfo = discs[cleanName]
+    if not discInfo then
+        discInfo = {name = discName, author = "Unknown", duration = 180*20, sound = "minecraft:music_disc." .. cleanName}
+    end
     
     self.currentTrack = {
         type = "disc",
-        sound = soundName,
+        sound = discInfo.sound,
         name = discInfo.name,
         author = discInfo.author,
         duration = discInfo.duration
@@ -118,7 +119,7 @@ function Player:playDisc(discName)
     self.state = Player.STATE_PLAYING
     
     -- Joue le son
-    self.speakers:playSound(soundName, 1, 1)
+    local played = self.speakers:playSound(discInfo.sound, 1, 1)
     
     if self.onTrackChange then
         self.onTrackChange(self.currentTrack)
@@ -127,7 +128,7 @@ function Player:playDisc(discName)
         self.onStateChange(self.state)
     end
     
-    return true
+    return played
 end
 
 -- Met à jour le lecteur (à appeler dans une boucle)

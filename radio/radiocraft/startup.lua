@@ -153,6 +153,45 @@ local function listRCMFiles()
 end
 
 -- ============================================
+-- GESTION DES FICHIERS RCM
+-- ============================================
+
+local function listRCMFiles()
+    local files = {}
+    
+    -- Fichiers locaux
+    if fs.exists(MUSIC_PATH) then
+        for _, file in ipairs(fs.list(MUSIC_PATH)) do
+            if string.match(file, "%.rcm$") then
+                table.insert(files, {
+                    name = file:gsub("%.rcm$", ""),
+                    path = MUSIC_PATH .. "/" .. file,
+                    source = "local"
+                })
+            end
+        end
+    end
+    
+    -- Fichiers sur disquette
+    if fs.exists(DISK_MUSIC_PATH) then
+        for _, file in ipairs(fs.list(DISK_MUSIC_PATH)) do
+            if string.match(file, "%.rcm$") then
+                table.insert(files, {
+                    name = file:gsub("%.rcm$", ""),
+                    path = DISK_MUSIC_PATH .. "/" .. file,
+                    source = "disk"
+                })
+            end
+        end
+    end
+    
+    return files
+end
+
+-- Variable globale pour la liste des fichiers RCM
+local rcmFiles = listRCMFiles()
+
+-- ============================================
 -- GESTIONNAIRE D'EVENEMENTS
 -- ============================================
 
@@ -169,6 +208,13 @@ local function handleButton(buttonId, touchX, touchData)
         ui:setTab("composer")
     elseif buttonId == "tab_settings" then
         ui:setTab("settings")
+    
+    -- Sous-onglets Jukebox
+    elseif buttonId == "subtab_discs" then
+        ui.jukeboxSubTab = "discs"
+    elseif buttonId == "subtab_rcm" then
+        ui.jukeboxSubTab = "rcm"
+        rcmFiles = listRCMFiles()  -- Rafraichit la liste
     
     -- Controles de lecture
     elseif buttonId == "ctrl_play" then
@@ -218,20 +264,36 @@ local function handleButton(buttonId, touchX, touchData)
     
     -- Assignment de zone pour un speaker
     elseif string.match(buttonId, "^speaker_zone_") then
+        local speakerName = buttonId:gsub("speaker_zone_", "")
         local speakerList = speakers:list()
-        local idx = tonumber(buttonId:gsub("speaker_zone_", ""))
-        if idx and speakerList[idx] then
-            zoneDialog = {
-                speakerName = speakerList[idx].name,
-                currentZone = speakerList[idx].zone
-            }
+        for _, spk in ipairs(speakerList) do
+            if spk.name == speakerName then
+                zoneDialog = {
+                    speakerName = spk.name,
+                    currentZone = spk.zone
+                }
+                break
+            end
         end
     
     -- Disques
     elseif string.match(buttonId, "^disc_") then
         local discId = buttonId:gsub("disc_", "")
         player:playDisc(discId)
-        print("[RadioCraft] Lecture: " .. discId)
+        print("[RadioCraft] Lecture disque: " .. discId)
+    
+    -- Fichiers RCM
+    elseif string.match(buttonId, "^rcm_") then
+        local idx = tonumber(buttonId:gsub("rcm_", ""))
+        if idx and rcmFiles[idx] then
+            local rcm = rcmFiles[idx]
+            local ok, err = player:playRCM(rcm.path)
+            if ok then
+                print("[RadioCraft] Lecture: " .. rcm.name)
+            else
+                print("[RadioCraft] Erreur: " .. tostring(err))
+            end
+        end
     
     -- Stations d'ambiance
     elseif string.match(buttonId, "^station_") then
@@ -320,13 +382,13 @@ local lastUpdate = os.clock()
 local tickInterval = 0.05 -- 20 ticks par seconde
 
 -- Premier affichage
-ui:draw(player, ambiance, composer, speakers)
+ui:draw(player, ambiance, composer, speakers, rcmFiles)
 
 while running do
     -- Gere le dialogue de zone si actif
     if zoneDialog then
         handleZoneDialog()
-        ui:draw(player, ambiance, composer, speakers)
+        ui:draw(player, ambiance, composer, speakers, rcmFiles)
     end
     
     -- Attend un evenement avec timeout
@@ -339,7 +401,7 @@ while running do
         
         if buttonId then
             handleButton(buttonId, touchX, touchData)
-            ui:draw(player, ambiance, composer, speakers)
+            ui:draw(player, ambiance, composer, speakers, rcmFiles)
         end
     
     elseif event == "key" then
@@ -350,34 +412,36 @@ while running do
             running = false
         elseif key == keys.space then
             player:togglePause()
-            ui:draw(player, ambiance, composer, speakers)
+            ui:draw(player, ambiance, composer, speakers, rcmFiles)
         elseif key == keys.s then
             player:stop()
-            ui:draw(player, ambiance, composer, speakers)
+            ui:draw(player, ambiance, composer, speakers, rcmFiles)
         elseif key == keys.r then
             speakers:discover()
-            ui:draw(player, ambiance, composer, speakers)
+            ui:draw(player, ambiance, composer, speakers, rcmFiles)
         elseif key == keys.t then
             -- Test sonore avec T
             print("[RadioCraft] Test sonore...")
             speakers:playNote("harp", 1, 12)
         elseif key == keys.up then
             speakers:setMasterVolume(speakers.masterVolume + 0.1)
-            ui:draw(player, ambiance, composer, speakers)
+            ui:draw(player, ambiance, composer, speakers, rcmFiles)
         elseif key == keys.down then
             speakers:setMasterVolume(speakers.masterVolume - 0.1)
-            ui:draw(player, ambiance, composer, speakers)
+            ui:draw(player, ambiance, composer, speakers, rcmFiles)
         end
     
     elseif event == "disk" then
         -- Disquette inseree
         print("[RadioCraft] Disquette detectee!")
-        ui:draw(player, ambiance, composer, speakers)
+        rcmFiles = listRCMFiles()  -- Rafraichit la liste
+        ui:draw(player, ambiance, composer, speakers, rcmFiles)
     
     elseif event == "disk_eject" then
         -- Disquette retiree
         print("[RadioCraft] Disquette retiree")
-        ui:draw(player, ambiance, composer, speakers)
+        rcmFiles = listRCMFiles()  -- Rafraichit la liste
+        ui:draw(player, ambiance, composer, speakers, rcmFiles)
     
     elseif event == "timer" or event == "alarm" then
         -- Rien
@@ -392,7 +456,7 @@ while running do
         
         -- Rafraichit l'affichage si en lecture
         if player:isPlaying() or ambiance:getIsPlaying() then
-            ui:draw(player, ambiance, composer, speakers)
+            ui:draw(player, ambiance, composer, speakers, rcmFiles)
         end
     end
 end

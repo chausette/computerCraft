@@ -12,22 +12,20 @@ Ambiance.STATIONS = {
         sounds = {
             {sound = "minecraft:ambient.cave", weight = 1, minDelay = 100, maxDelay = 300},
             {sound = "minecraft:entity.bat.ambient", weight = 2, minDelay = 60, maxDelay = 200},
-            {sound = "minecraft:block.grass.step", weight = 3, minDelay = 20, maxDelay = 60},
             {sound = "minecraft:entity.bee.loop", weight = 1, minDelay = 200, maxDelay = 400},
             {sound = "minecraft:entity.parrot.ambient", weight = 2, minDelay = 80, maxDelay = 180},
             {sound = "minecraft:entity.wolf.ambient", weight = 1, minDelay = 150, maxDelay = 350},
+            {sound = "minecraft:entity.chicken.ambient", weight = 2, minDelay = 60, maxDelay = 150},
         }
     },
     cave = {
         name = "Grotte",
         icon = "O",
         sounds = {
-            {sound = "minecraft:ambient.cave", weight = 5, minDelay = 60, maxDelay = 180},
+            {sound = "minecraft:ambient.cave", weight = 5, minDelay = 40, maxDelay = 120},
             {sound = "minecraft:entity.bat.ambient", weight = 3, minDelay = 40, maxDelay = 120},
-            {sound = "minecraft:block.stone.step", weight = 2, minDelay = 30, maxDelay = 80},
-            {sound = "minecraft:block.gravel.step", weight = 2, minDelay = 40, maxDelay = 100},
             {sound = "minecraft:entity.bat.takeoff", weight = 1, minDelay = 100, maxDelay = 250},
-            {sound = "minecraft:block.pointed_dripstone.drip_water", weight = 4, minDelay = 20, maxDelay = 60},
+            {sound = "minecraft:block.stone.break", weight = 2, minDelay = 80, maxDelay = 200},
         }
     },
     nether = {
@@ -35,7 +33,6 @@ Ambiance.STATIONS = {
         icon = "!",
         sounds = {
             {sound = "minecraft:ambient.nether_wastes.loop", weight = 3, minDelay = 100, maxDelay = 200},
-            {sound = "minecraft:ambient.soul_sand_valley.loop", weight = 2, minDelay = 120, maxDelay = 240},
             {sound = "minecraft:entity.ghast.ambient", weight = 2, minDelay = 80, maxDelay = 200},
             {sound = "minecraft:entity.blaze.ambient", weight = 2, minDelay = 60, maxDelay = 150},
             {sound = "minecraft:entity.piglin.ambient", weight = 1, minDelay = 100, maxDelay = 250},
@@ -46,45 +43,31 @@ Ambiance.STATIONS = {
         name = "Ocean",
         icon = "~",
         sounds = {
-            {sound = "minecraft:ambient.underwater.loop", weight = 5, minDelay = 100, maxDelay = 200},
+            {sound = "minecraft:ambient.underwater.loop", weight = 5, minDelay = 80, maxDelay = 160},
             {sound = "minecraft:entity.dolphin.ambient_water", weight = 2, minDelay = 80, maxDelay = 180},
             {sound = "minecraft:entity.fish.swim", weight = 3, minDelay = 40, maxDelay = 100},
             {sound = "minecraft:entity.squid.ambient", weight = 2, minDelay = 60, maxDelay = 150},
-            {sound = "minecraft:block.bubble_column.bubble_pop", weight = 3, minDelay = 30, maxDelay = 80},
         }
     },
     rain = {
         name = "Pluie",
         icon = ",",
         sounds = {
-            {sound = "minecraft:weather.rain", weight = 5, minDelay = 60, maxDelay = 120},
-            {sound = "minecraft:weather.rain.above", weight = 4, minDelay = 80, maxDelay = 150},
+            {sound = "minecraft:weather.rain", weight = 5, minDelay = 40, maxDelay = 80},
+            {sound = "minecraft:weather.rain.above", weight = 4, minDelay = 60, maxDelay = 120},
             {sound = "minecraft:entity.lightning_bolt.thunder", weight = 1, minDelay = 200, maxDelay = 600},
-            {sound = "minecraft:block.wet_grass.step", weight = 2, minDelay = 40, maxDelay = 100},
-        }
-    },
-    end_dimension = {
-        name = "End",
-        icon = "#",
-        sounds = {
-            {sound = "minecraft:ambient.basalt_deltas.loop", weight = 3, minDelay = 100, maxDelay = 200},
-            {sound = "minecraft:entity.enderman.ambient", weight = 2, minDelay = 80, maxDelay = 200},
-            {sound = "minecraft:entity.enderman.teleport", weight = 1, minDelay = 120, maxDelay = 300},
-            {sound = "minecraft:entity.shulker.ambient", weight = 2, minDelay = 100, maxDelay = 220},
-            {sound = "minecraft:block.end_portal.spawn", weight = 1, minDelay = 300, maxDelay = 600},
         }
     },
     spooky = {
         name = "Horreur",
         icon = "X",
         sounds = {
-            {sound = "minecraft:ambient.cave", weight = 4, minDelay = 40, maxDelay = 100},
+            {sound = "minecraft:ambient.cave", weight = 4, minDelay = 30, maxDelay = 80},
             {sound = "minecraft:entity.ghast.scream", weight = 1, minDelay = 150, maxDelay = 400},
             {sound = "minecraft:entity.phantom.ambient", weight = 2, minDelay = 80, maxDelay = 200},
             {sound = "minecraft:entity.zombie.ambient", weight = 2, minDelay = 60, maxDelay = 150},
             {sound = "minecraft:entity.skeleton.ambient", weight = 2, minDelay = 70, maxDelay = 160},
             {sound = "minecraft:entity.witch.ambient", weight = 1, minDelay = 100, maxDelay = 250},
-            {sound = "minecraft:entity.warden.heartbeat", weight = 3, minDelay = 30, maxDelay = 60},
         }
     },
     village = {
@@ -97,7 +80,6 @@ Ambiance.STATIONS = {
             {sound = "minecraft:entity.chicken.ambient", weight = 3, minDelay = 50, maxDelay = 120},
             {sound = "minecraft:entity.cow.ambient", weight = 2, minDelay = 60, maxDelay = 140},
             {sound = "minecraft:entity.pig.ambient", weight = 2, minDelay = 70, maxDelay = 150},
-            {sound = "minecraft:block.campfire.crackle", weight = 3, minDelay = 40, maxDelay = 80},
         }
     },
     peaceful = {
@@ -105,10 +87,9 @@ Ambiance.STATIONS = {
         icon = "-",
         sounds = {
             {sound = "minecraft:block.amethyst_block.chime", weight = 3, minDelay = 60, maxDelay = 150},
-            {sound = "minecraft:block.azalea_leaves.place", weight = 2, minDelay = 80, maxDelay = 180},
-            {sound = "minecraft:entity.allay.ambient_without_item", weight = 2, minDelay = 100, maxDelay = 220},
-            {sound = "minecraft:entity.axolotl.idle_air", weight = 2, minDelay = 90, maxDelay = 200},
-            {sound = "minecraft:block.flowering_azalea.place", weight = 2, minDelay = 100, maxDelay = 200},
+            {sound = "minecraft:block.note_block.harp", weight = 2, minDelay = 80, maxDelay = 180},
+            {sound = "minecraft:block.note_block.chime", weight = 2, minDelay = 100, maxDelay = 220},
+            {sound = "minecraft:entity.experience_orb.pickup", weight = 1, minDelay = 150, maxDelay = 300},
         }
     }
 }

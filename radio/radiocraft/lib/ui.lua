@@ -27,6 +27,7 @@ function UI.new(monitor)
     self.monitor = monitor
     self.width, self.height = monitor.getSize()
     self.currentTab = "jukebox"
+    self.jukeboxSubTab = "discs"
     self.scrollOffset = {}
     self.buttons = {}
     self.touchAreas = {}
@@ -208,59 +209,117 @@ function UI:drawFooter(player, speakers)
 end
 
 -- Dessine l'onglet Jukebox
-function UI:drawJukebox(player, discs)
+function UI:drawJukebox(player, rcmFiles)
     local y = 4
     
-    self:text(2, y, "Disques disponibles:", UI.COLORS.accent)
-    y = y + 1
+    -- Sous-onglets : Disques / Mes musiques
+    local subTab = self.jukeboxSubTab or "discs"
     
-    discs = discs or {
-        {id = "cat", name = "Cat", author = "C418"},
-        {id = "blocks", name = "Blocks", author = "C418"},
-        {id = "chirp", name = "Chirp", author = "C418"},
-        {id = "far", name = "Far", author = "C418"},
-        {id = "mall", name = "Mall", author = "C418"},
-        {id = "mellohi", name = "Mellohi", author = "C418"},
-        {id = "stal", name = "Stal", author = "C418"},
-        {id = "strad", name = "Strad", author = "C418"},
-        {id = "ward", name = "Ward", author = "C418"},
-        {id = "wait", name = "Wait", author = "C418"},
-        {id = "pigstep", name = "Pigstep", author = "Lena Raine"},
-        {id = "otherside", name = "Otherside", author = "Lena Raine"},
-    }
+    self:rect(2, y, 12, 1, subTab == "discs" and UI.COLORS.selected or UI.COLORS.button)
+    self:text(4, y, "Disques", UI.COLORS.buttonText, subTab == "discs" and UI.COLORS.selected or UI.COLORS.button)
+    table.insert(self.buttons, {id = "subtab_discs", x1 = 2, y1 = y, x2 = 13, y2 = y})
     
-    local offset = self.scrollOffset.jukebox or 0
-    local visible = self.height - 8
+    self:rect(15, y, 14, 1, subTab == "rcm" and UI.COLORS.selected or UI.COLORS.button)
+    self:text(16, y, "Mes musiques", UI.COLORS.buttonText, subTab == "rcm" and UI.COLORS.selected or UI.COLORS.button)
+    table.insert(self.buttons, {id = "subtab_rcm", x1 = 15, y1 = y, x2 = 28, y2 = y})
     
-    for i = 1, visible do
-        local idx = i + offset
-        if idx <= #discs then
-            local disc = discs[idx]
-            local isPlaying = player and player:getCurrentTrack() 
-                and player:getCurrentTrack().name == disc.name
-            
-            local bg = isPlaying and UI.COLORS.selected or UI.COLORS.bg
-            local fg = isPlaying and UI.COLORS.buttonText or UI.COLORS.fg
-            
-            self:rect(2, y, self.width - 2, 1, bg)
-            self:text(2, y, string.format("%-12s %s", disc.name, disc.author), fg, bg)
-            
-            table.insert(self.buttons, {
-                id = "disc_" .. disc.id,
-                x1 = 2, y1 = y,
-                x2 = self.width - 1, y2 = y
-            })
-            
-            y = y + 1
+    y = y + 2
+    
+    if subTab == "discs" then
+        -- Liste des disques vanilla
+        local discs = {
+            {id = "13", name = "13", author = "C418"},
+            {id = "cat", name = "Cat", author = "C418"},
+            {id = "blocks", name = "Blocks", author = "C418"},
+            {id = "chirp", name = "Chirp", author = "C418"},
+            {id = "far", name = "Far", author = "C418"},
+            {id = "mall", name = "Mall", author = "C418"},
+            {id = "mellohi", name = "Mellohi", author = "C418"},
+            {id = "stal", name = "Stal", author = "C418"},
+            {id = "strad", name = "Strad", author = "C418"},
+            {id = "ward", name = "Ward", author = "C418"},
+            {id = "11", name = "11", author = "C418"},
+            {id = "wait", name = "Wait", author = "C418"},
+            {id = "pigstep", name = "Pigstep", author = "Lena Raine"},
+            {id = "otherside", name = "Otherside", author = "Lena Raine"},
+            {id = "5", name = "5", author = "Samuel Aberg"},
+            {id = "relic", name = "Relic", author = "Aaron Cherof"},
+        }
+        
+        local offset = self.scrollOffset.jukebox or 0
+        local visible = self.height - 10
+        
+        for i = 1, visible do
+            local idx = i + offset
+            if idx <= #discs then
+                local disc = discs[idx]
+                local isPlaying = player and player:getCurrentTrack() 
+                    and player:getCurrentTrack().name == disc.name
+                
+                local bg = isPlaying and UI.COLORS.selected or UI.COLORS.bg
+                local fg = isPlaying and UI.COLORS.buttonText or UI.COLORS.fg
+                
+                self:rect(2, y, self.width - 3, 1, bg)
+                self:text(2, y, string.format("%-12s %s", disc.name, disc.author), fg, bg)
+                
+                table.insert(self.buttons, {
+                    id = "disc_" .. disc.id,
+                    x1 = 2, y1 = y,
+                    x2 = self.width - 1, y2 = y
+                })
+                
+                y = y + 1
+            end
         end
-    end
-    
-    -- Scroll indicators
-    if offset > 0 then
-        self:text(self.width, 4, "^", UI.COLORS.accent)
-    end
-    if offset + visible < #discs then
-        self:text(self.width, self.height - 4, "v", UI.COLORS.accent)
+        
+        -- Scroll indicators
+        if offset > 0 then
+            self:text(self.width - 1, 6, "^", UI.COLORS.accent)
+        end
+        if offset + visible < #discs then
+            self:text(self.width - 1, self.height - 5, "v", UI.COLORS.accent)
+        end
+    else
+        -- Liste des fichiers RCM
+        rcmFiles = rcmFiles or {}
+        
+        if #rcmFiles == 0 then
+            self:text(2, y, "Aucune musique trouvee.", UI.COLORS.muted)
+            y = y + 2
+            self:text(2, y, "Placez des fichiers .rcm dans:", UI.COLORS.muted)
+            y = y + 1
+            self:text(2, y, "  /radiocraft/music/", UI.COLORS.accent)
+            y = y + 1
+            self:text(2, y, "  /disk/songs/", UI.COLORS.accent)
+        else
+            local offset = self.scrollOffset.rcm or 0
+            local visible = self.height - 10
+            
+            for i = 1, visible do
+                local idx = i + offset
+                if idx <= #rcmFiles then
+                    local rcm = rcmFiles[idx]
+                    local isPlaying = player and player:getCurrentTrack()
+                        and player:getCurrentTrack().path == rcm.path
+                    
+                    local bg = isPlaying and UI.COLORS.selected or UI.COLORS.bg
+                    local fg = isPlaying and UI.COLORS.buttonText or UI.COLORS.fg
+                    
+                    self:rect(2, y, self.width - 3, 1, bg)
+                    
+                    local source = rcm.source == "disk" and "[D]" or "[L]"
+                    self:text(2, y, string.format("%s %-20s", source, rcm.name), fg, bg)
+                    
+                    table.insert(self.buttons, {
+                        id = "rcm_" .. idx,
+                        x1 = 2, y1 = y,
+                        x2 = self.width - 1, y2 = y
+                    })
+                    
+                    y = y + 1
+                end
+            end
+        end
     end
 end
 
@@ -394,10 +453,9 @@ function UI:drawSettings(speakers, player)
                 self:rect(self.width - 10, y, 8, 1, UI.COLORS.button)
                 self:text(self.width - 9, y, "Zone", UI.COLORS.buttonText, UI.COLORS.button)
                 table.insert(self.buttons, {
-                    id = "speaker_zone_" .. idx,
+                    id = "speaker_zone_" .. spk.name,
                     x1 = self.width - 10, y1 = y,
-                    x2 = self.width - 3, y2 = y,
-                    data = {speaker = spk.name}
+                    x2 = self.width - 3, y2 = y
                 })
                 
                 y = y + 1
@@ -443,12 +501,12 @@ function UI:drawSettings(speakers, player)
 end
 
 -- Dessine tout l'écran
-function UI:draw(player, ambiance, composer, speakers)
+function UI:draw(player, ambiance, composer, speakers, rcmFiles)
     self:clear()
     self:drawHeader()
     
     if self.currentTab == "jukebox" then
-        self:drawJukebox(player)
+        self:drawJukebox(player, rcmFiles)
     elseif self.currentTab == "ambiance" then
         self:drawAmbiance(ambiance)
     elseif self.currentTab == "composer" then
