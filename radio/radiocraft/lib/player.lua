@@ -335,6 +335,14 @@ function Player:getProgress()
     return self.currentTick, self.currentTrack.duration
 end
 
+-- Seek à une position spécifique
+function Player:seek(tick)
+    if self.currentTrack and self.currentTrack.duration then
+        tick = math.max(0, math.min(tick, self.currentTrack.duration))
+        self.currentTick = tick
+    end
+end
+
 function Player:getQueue()
     return self.queue
 end

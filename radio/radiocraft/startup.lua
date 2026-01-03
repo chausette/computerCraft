@@ -261,6 +261,16 @@ local function handleButton(buttonId, touchX, touchData)
         local newVol = touchX / touchData.width
         speakers:setMasterVolume(newVol)
     
+    -- Seek dans la musique
+    elseif buttonId == "seek_bar" and touchX and touchData then
+        local progress = touchX / touchData.width
+        local _, duration = player:getProgress()
+        if duration > 0 then
+            local newTick = math.floor(progress * duration)
+            player:seek(newTick)
+            print("[RadioCraft] Seek: " .. math.floor(progress * 100) .. "%")
+        end
+    
     -- Volume master (settings)
     elseif buttonId == "master_vol_up" then
         speakers:setMasterVolume(speakers.masterVolume + 0.1)

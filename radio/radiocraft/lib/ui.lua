@@ -158,54 +158,144 @@ function UI:drawHeader()
     end
 end
 
--- Dessine le footer avec contrôles
-function UI:drawFooter(player, speakers)
-    local y = self.height - 1
+-- Formatte le temps en mm:ss
+local function formatTime(ticks)
+    ticks = ticks or 0
+    local seconds = math.floor(ticks / 20)
+    local minutes = math.floor(seconds / 60)
+    seconds = seconds % 60
+    return string.format("%d:%02d", minutes, seconds)
+end
+
+-- Dessine le footer avec contrôles et progression
+function UI:drawFooter(player, speakers, ambiance)
+    local footerHeight = 4
+    local y = self.height - footerHeight + 1
     
-    self:rect(1, y, self.width, 2, UI.COLORS.muted)
+    -- Fond du footer
+    self:rect(1, y, self.width, footerHeight, UI.COLORS.muted)
     
-    -- Contrôles de lecture
+    -- Ligne 1: Now Playing + Temps
+    if player and player:getCurrentTrack() then
+        local track = player:getCurrentTrack()
+        local name = track.name or "Unknown"
+        local author = track.author or ""
+        
+        -- Nom de la piste
+        local displayName = name
+        if author ~= "" and author ~= "Unknown" then
+            displayName = name .. " - " .. author
+        end
+        if #displayName > self.width - 20 then
+            displayName = string.sub(displayName, 1, self.width - 23) .. "..."
+        end
+        
+        -- Icône play/pause
+        local icon = player:isPlaying() and ">" or "||"
+        if player:isStopped() then icon = "[]" end
+        
+        self:text(2, y, icon .. " " .. displayName, UI.COLORS.accent, UI.COLORS.muted)
+        
+        -- Temps actuel / Temps total
+        local currentTick, totalTick = player:getProgress()
+        local currentTime = formatTime(currentTick)
+        local totalTime = formatTime(totalTick)
+        local timeStr = currentTime .. "/" .. totalTime
+        
+        self:text(self.width - #timeStr, y, timeStr, UI.COLORS.fg, UI.COLORS.muted)
+    elseif ambiance and ambiance:getIsPlaying() then
+        -- Affiche l'ambiance si pas de musique
+        local station = ambiance:getCurrentStation()
+        if station then
+            self:text(2, y, "~ Ambiance: " .. station.name, UI.COLORS.accent, UI.COLORS.muted)
+        else
+            self:text(2, y, "~ Ambiance active", UI.COLORS.accent, UI.COLORS.muted)
+        end
+    else
+        self:text(2, y, "Aucune musique", UI.COLORS.fg, UI.COLORS.muted)
+    end
+    
+    y = y + 1
+    
+    -- Ligne 2: Barre de progression
+    if player and player:getCurrentTrack() then
+        local currentTick, totalTick = player:getProgress()
+        local progress = 0
+        if totalTick > 0 then
+            progress = currentTick / totalTick
+        end
+        
+        local barWidth = self.width - 4
+        local filled = math.floor(progress * barWidth)
+        
+        self:text(2, y, "[", UI.COLORS.fg, UI.COLORS.muted)
+        
+        self.monitor.setCursorPos(3, y)
+        self.monitor.setBackgroundColor(UI.COLORS.progress)
+        self.monitor.write(string.rep(" ", filled))
+        self.monitor.setBackgroundColor(UI.COLORS.progressBg)
+        self.monitor.write(string.rep(" ", barWidth - filled))
+        self.monitor.setBackgroundColor(UI.COLORS.muted)
+        
+        self:text(self.width - 1, y, "]", UI.COLORS.fg, UI.COLORS.muted)
+        
+        -- Zone cliquable pour seek
+        table.insert(self.touchAreas, {
+            id = "seek_bar",
+            x1 = 3, y1 = y,
+            x2 = 2 + barWidth, y2 = y,
+            data = {width = barWidth}
+        })
+    else
+        -- Barre vide
+        local barWidth = self.width - 4
+        self:text(2, y, "[", UI.COLORS.fg, UI.COLORS.muted)
+        self.monitor.setCursorPos(3, y)
+        self.monitor.setBackgroundColor(UI.COLORS.progressBg)
+        self.monitor.write(string.rep(" ", barWidth))
+        self.monitor.setBackgroundColor(UI.COLORS.muted)
+        self:text(self.width - 1, y, "]", UI.COLORS.fg, UI.COLORS.muted)
+    end
+    
+    y = y + 1
+    
+    -- Ligne 3: Contrôles de lecture
     local controls = {
         {id = "prev", label = "|<", x = 2},
         {id = "stop", label = "[]", x = 6},
         {id = "play", label = player and player:isPlaying() and "||" or ">", x = 10},
         {id = "next", label = ">|", x = 14},
         {id = "shuffle", label = "~", x = 19, active = player and player.shuffle},
-        {id = "repeat", label = player and (player.repeatMode == "one" and "1" or player.repeatMode == "all" and "@" or "-"), x = 23},
+        {id = "repeat", label = player and (player.repeatMode == "one" and "R1" or player.repeatMode == "all" and "RA" or "R-"), x = 23},
     }
     
     for _, ctrl in ipairs(controls) do
         local bg = ctrl.active and UI.COLORS.selected or UI.COLORS.button
-        self:rect(ctrl.x, y, 3, 1, bg)
-        self:text(ctrl.x, y, ctrl.label, UI.COLORS.buttonText, bg)
+        local w = #ctrl.label + 2
+        self:rect(ctrl.x, y, w, 1, bg)
+        self:text(ctrl.x + 1, y, ctrl.label, UI.COLORS.buttonText, bg)
         
         table.insert(self.buttons, {
             id = "ctrl_" .. ctrl.id,
             x1 = ctrl.x, y1 = y,
-            x2 = ctrl.x + 2, y2 = y
+            x2 = ctrl.x + w - 1, y2 = y
         })
     end
     
-    -- Volume avec boutons - et +
-    local volX = self.width - 12
+    -- Volume
+    local volX = self.width - 14
     self:text(volX, y, "-", UI.COLORS.buttonText, UI.COLORS.button)
     table.insert(self.buttons, {id = "vol_down", x1 = volX, y1 = y, x2 = volX, y2 = y})
     
     local vol = speakers and speakers.masterVolume or 1
-    self:volumeBar(volX + 2, y, 8, vol, "master_volume")
+    local volPercent = string.format("%3d%%", math.floor(vol * 100))
     
-    self:text(volX + 10, y, "+", UI.COLORS.buttonText, UI.COLORS.button)
-    table.insert(self.buttons, {id = "vol_up", x1 = volX + 10, y1 = y, x2 = volX + 10, y2 = y})
+    self:volumeBar(volX + 2, y, 6, vol, "master_volume")
     
-    -- Now playing
-    if player and player:getCurrentTrack() then
-        local track = player:getCurrentTrack()
-        local name = track.name or "Unknown"
-        if #name > self.width - 4 then
-            name = string.sub(name, 1, self.width - 7) .. "..."
-        end
-        self:centerText(self.height, name, UI.COLORS.accent, UI.COLORS.muted)
-    end
+    self:text(volX + 9, y, "+", UI.COLORS.buttonText, UI.COLORS.button)
+    table.insert(self.buttons, {id = "vol_up", x1 = volX + 9, y1 = y, x2 = volX + 9, y2 = y})
+    
+    self:text(volX + 11, y, volPercent, UI.COLORS.fg, UI.COLORS.muted)
 end
 
 -- Dessine l'onglet Jukebox
@@ -476,7 +566,7 @@ function UI:draw(player, ambiance, composer, speakers, rcmFiles)
         self:drawSettings(speakers, player)
     end
     
-    self:drawFooter(player, speakers)
+    self:drawFooter(player, speakers, ambiance)
     
     -- Reset colors
     self.monitor.setBackgroundColor(UI.COLORS.bg)
