@@ -1,35 +1,14 @@
 -- ============================================
--- MOB TOWER MANAGER - Utils Library
+-- MOB TOWER MANAGER v1.1 - Utils Library
 -- Fonctions utilitaires communes
+-- Version 1.21 NeoForge
 -- ============================================
 
 local utils = {}
 
--- Couleurs bundled cable
-utils.COLORS = {
-    white = colors.white,
-    orange = colors.orange,
-    magenta = colors.magenta,
-    lightBlue = colors.lightBlue,
-    yellow = colors.yellow,
-    lime = colors.lime,
-    pink = colors.pink,
-    gray = colors.gray,
-    lightGray = colors.lightGray,
-    cyan = colors.cyan,
-    purple = colors.purple,
-    blue = colors.blue,
-    brown = colors.brown,
-    green = colors.green,
-    red = colors.red,
-    black = colors.black
-}
-
--- Liste des couleurs pour le menu
-utils.COLOR_NAMES = {
-    "white", "orange", "magenta", "lightBlue", "yellow", "lime",
-    "pink", "gray", "lightGray", "cyan", "purple", "blue",
-    "brown", "green", "red", "black"
+-- Côtés disponibles pour redstone
+utils.SIDES = {
+    "top", "bottom", "left", "right", "front", "back"
 }
 
 -- Items rares (pour alertes)

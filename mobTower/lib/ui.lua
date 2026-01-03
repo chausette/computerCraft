@@ -1,6 +1,7 @@
 -- ============================================
--- MOB TOWER MANAGER - UI Library
+-- MOB TOWER MANAGER v1.1 - UI Library
 -- Interface graphique moniteur
+-- Version 1.21 NeoForge
 -- ============================================
 
 local utils = require("mobTower.lib.utils")
@@ -98,49 +99,10 @@ end
 -- Dessiner une ligne horizontale
 function ui.drawLine(y, char, fg)
     if not monitor then return end
-    char = char or "\140"
+    char = char or "-"
     ui.setColors(fg or theme.border, theme.bg)
     ui.setCursor(1, y)
     ui.write(string.rep(char, width))
-end
-
--- Dessiner un rectangle
-function ui.drawBox(x, y, w, h, title, fg)
-    if not monitor then return end
-    fg = fg or theme.border
-    
-    -- Coins et bordures
-    local topLeft = "\151"
-    local topRight = "\148"
-    local bottomLeft = "\138"
-    local bottomRight = "\133"
-    local horizontal = "\140"
-    local vertical = "\149"
-    
-    ui.setColors(fg, theme.bg)
-    
-    -- Haut
-    ui.setCursor(x, y)
-    ui.write(topLeft .. string.rep(horizontal, w - 2) .. topRight)
-    
-    -- Côtés
-    for i = 1, h - 2 do
-        ui.setCursor(x, y + i)
-        ui.write(vertical)
-        ui.setCursor(x + w - 1, y + i)
-        ui.write(vertical)
-    end
-    
-    -- Bas
-    ui.setCursor(x, y + h - 1)
-    ui.write(bottomLeft .. string.rep(horizontal, w - 2) .. bottomRight)
-    
-    -- Titre
-    if title then
-        ui.setCursor(x + 2, y)
-        ui.setColors(theme.accent, theme.bg)
-        ui.write(" " .. title .. " ")
-    end
 end
 
 -- ============================================
@@ -220,7 +182,7 @@ function ui.drawHeader(title, spawnOn, sessionTime)
     
     -- Titre
     ui.setCursor(2, 1)
-    ui.write("\4 " .. title)
+    ui.write("# " .. title)
     
     -- État spawn
     local spawnText = spawnOn and "[ON ]" or "[OFF]"
@@ -230,7 +192,7 @@ function ui.drawHeader(title, spawnOn, sessionTime)
     ui.write(spawnText)
     
     -- Temps session
-    local timeText = "\2 " .. utils.formatTime(sessionTime)
+    local timeText = "Session: " .. utils.formatTime(sessionTime)
     ui.setCursor(width - #timeText, 1)
     ui.setColors(theme.headerText, theme.header)
     ui.write(timeText)
@@ -242,28 +204,23 @@ function ui.drawStats(x, y, stats, playerPresent)
     if not monitor then return end
     
     -- Titre section
-    ui.writeLine(x, y, "STATS EN DIRECT", theme.accent)
+    ui.writeLine(x, y, "STATISTIQUES", theme.accent)
     
     -- Indicateur joueur
-    local playerIcon = playerPresent and "\7" or "\21"
-    local playerColor = playerPresent and theme.success or theme.danger
-    ui.writeLine(x + 16, y, playerIcon, playerColor)
+    local playerIcon = playerPresent and "*" or "."
+    local playerColor = playerPresent and theme.success or theme.textDim
+    ui.writeLine(x + 13, y, playerIcon, playerColor)
     
     y = y + 2
     
-    -- Mobs en attente
-    ui.writeLine(x, y, "Mobs attente:", theme.textDim)
-    ui.writeLine(x + 14, y, utils.formatNumber(stats.mobsWaiting), theme.text)
-    y = y + 1
-    
-    -- Tués session
-    ui.writeLine(x, y, "Tues session:", theme.textDim)
-    ui.writeLine(x + 14, y, utils.formatNumber(stats.session.mobsKilled), theme.success)
+    -- Tués session (estimation)
+    ui.writeLine(x, y, "Mobs session:", theme.textDim)
+    ui.writeLine(x + 14, y, "~" .. utils.formatNumber(stats.session.mobsKilled), theme.success)
     y = y + 1
     
     -- Tués total
-    ui.writeLine(x, y, "Tues total:", theme.textDim)
-    ui.writeLine(x + 14, y, utils.formatNumber(stats.total.mobsKilled), theme.text)
+    ui.writeLine(x, y, "Mobs total:", theme.textDim)
+    ui.writeLine(x + 14, y, "~" .. utils.formatNumber(stats.total.mobsKilled), theme.text)
     y = y + 2
     
     -- Items session
@@ -274,6 +231,11 @@ function ui.drawStats(x, y, stats, playerPresent)
     -- Items total
     ui.writeLine(x, y, "Items total:", theme.textDim)
     ui.writeLine(x + 14, y, utils.formatNumber(stats.total.itemsCollected), theme.text)
+    y = y + 2
+    
+    -- Rares session
+    ui.writeLine(x, y, "Rares:", theme.textDim)
+    ui.writeLine(x + 14, y, utils.formatNumber(stats.session.raresFound), theme.rare)
 end
 
 function ui.drawGraph(x, y, w, h, hourlyData)
@@ -297,7 +259,7 @@ function ui.drawGraph(x, y, w, h, hourlyData)
     end
     
     -- Afficher max
-    ui.writeLine(x, y, "Max: " .. utils.formatNumber(maxVal) .. "/h", theme.textDim)
+    ui.writeLine(x, y, "Max: ~" .. utils.formatNumber(maxVal) .. "/h", theme.textDim)
     y = y + 1
     
     -- Dessiner le graphique
@@ -334,7 +296,7 @@ function ui.drawStorage(x, y, storageStatus)
     for _, warning in ipairs(storageStatus.warnings) do
         if warningCount >= 2 then break end
         
-        local icon = warning.level == "critical" and "\7" or "!"
+        local icon = warning.level == "critical" and "!" or ">"
         local color = warning.level == "critical" and theme.danger or theme.warning
         
         local text = icon .. " " .. utils.truncate(warning.item, 12) .. ": " .. warning.percent .. "%"
@@ -352,7 +314,7 @@ function ui.drawRareItems(x, y, rareItems)
     if not monitor then return end
     
     -- Titre avec étoile
-    ui.writeLine(x, y, "\4 ITEMS RARES", theme.rare)
+    ui.writeLine(x, y, "* ITEMS RARES", theme.rare)
     y = y + 2
     
     if not rareItems or #rareItems == 0 then
@@ -366,7 +328,7 @@ function ui.drawRareItems(x, y, rareItems)
         local name = utils.truncate(utils.getShortName(item.name), 16)
         local time = utils.formatTimestamp(item.time)
         
-        ui.writeLine(x, y, "\7 ", theme.rare)
+        ui.writeLine(x, y, "> ", theme.rare)
         ui.writeLine(x + 2, y, name, theme.text)
         ui.writeLine(x + 20, y, time, theme.textDim)
         y = y + 1
@@ -376,7 +338,7 @@ end
 function ui.drawFooter(y)
     if not monitor then return end
     
-    ui.drawLine(y, "\140", theme.border)
+    ui.drawLine(y, "-", theme.border)
     y = y + 1
     
     ui.writeLine(2, y, "[S] Spawn", theme.accent)
@@ -395,7 +357,7 @@ function ui.drawMainScreen(data)
     ui.clear()
     
     -- En-tête
-    ui.drawHeader("MOB TOWER v1.0", data.spawnOn, data.sessionTime)
+    ui.drawHeader("MOB TOWER v1.1", data.spawnOn, data.sessionTime)
     
     -- Ligne de séparation
     ui.drawLine(2)

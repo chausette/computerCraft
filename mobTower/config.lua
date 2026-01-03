@@ -1,45 +1,39 @@
 -- ============================================
--- MOB TOWER MANAGER - Configuration
--- Fichier de configuration utilisateur
+-- MOB TOWER MANAGER v1.1 - Configuration
+-- Version 1.21 NeoForge
 -- ============================================
 
 local config = {
     -- Version de la config
-    version = "1.0",
+    version = "1.1",
     
     -- Informations utilisateur
     player = {
-        name = "MikeChausette"
+        name = "MikeChausette",
+        -- Distance de détection du Player Detector
+        detectionRange = 16
     },
     
     -- Périphériques (noms sur le réseau)
     peripherals = {
-        -- Entity Sensor dans la darkroom (haut)
-        entitySensorTop = nil,
-        
-        -- Entity Sensor dans la zone de kill (bas)
-        entitySensorBottom = nil,
-        
-        -- Inventory Manager pour le tri
-        inventoryManager = nil,
-        
-        -- Redstone Integrator pour les lampes
-        redstoneIntegrator = nil,
+        -- Player Detector (Advanced Peripherals)
+        playerDetector = nil,
         
         -- Moniteur 3x2
         monitor = nil
     },
     
     -- Configuration redstone (lampes)
+    -- Utilise la sortie redstone directe du computer
     redstone = {
-        -- Côté du bundled cable sur le Redstone Integrator
+        -- Côté de sortie redstone
+        -- Options: top, bottom, left, right, front, back
         side = "back",
         
-        -- Couleur du câble pour les lampes
-        -- Options: white, orange, magenta, lightBlue, yellow, lime,
-        --          pink, gray, lightGray, cyan, purple, blue,
-        --          brown, green, red, black
-        color = "white"
+        -- Inverser le signal
+        -- false = signal OFF quand spawn ON (lampes éteintes)
+        -- true = signal ON quand spawn ON (lampes allumées)
+        inverted = false
     },
     
     -- Configuration stockage

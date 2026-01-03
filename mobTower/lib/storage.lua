@@ -1,6 +1,7 @@
 -- ============================================
--- MOB TOWER MANAGER - Storage Library
+-- MOB TOWER MANAGER v1.1 - Storage Library
 -- Gestion du tri et des inventaires
+-- Version 1.21 - Estimation des kills par items
 -- ============================================
 
 local utils = require("mobTower.lib.utils")
@@ -16,8 +17,7 @@ local stats = {
         startTime = 0,
         mobsKilled = 0,
         itemsCollected = 0,
-        raresFound = 0,
-        lastMobCount = 0
+        raresFound = 0
     },
     total = {
         mobsKilled = 0,
@@ -30,6 +30,24 @@ local stats = {
 }
 
 local DATA_FILE = "mobTower/data/stats.dat"
+
+-- Table de conversion items -> mobs estimés
+-- Basé sur les drop rates moyens de Minecraft
+local MOB_ESTIMATES = {
+    ["minecraft:rotten_flesh"] = { mob = "zombie", rate = 1.0 },      -- 0-2 par zombie, moyenne ~1
+    ["minecraft:bone"] = { mob = "skeleton", rate = 0.5 },            -- 0-2 par skeleton
+    ["minecraft:arrow"] = { mob = "skeleton", rate = 0.25 },          -- 0-2 par skeleton (compte avec bone)
+    ["minecraft:gunpowder"] = { mob = "creeper", rate = 0.75 },       -- 0-2 par creeper
+    ["minecraft:ender_pearl"] = { mob = "enderman", rate = 1.0 },     -- 0-1 par enderman
+    ["minecraft:string"] = { mob = "spider", rate = 0.5 },            -- 0-2 par spider
+    ["minecraft:spider_eye"] = { mob = "spider", rate = 0.33 },       -- 0-1 par spider
+    -- Witch drops (estimations combinées)
+    ["minecraft:redstone"] = { mob = "witch", rate = 0.25 },
+    ["minecraft:glowstone_dust"] = { mob = "witch", rate = 0.25 },
+    ["minecraft:sugar"] = { mob = "witch", rate = 0.25 },
+    ["minecraft:glass_bottle"] = { mob = "witch", rate = 0.25 },
+    ["minecraft:stick"] = { mob = "witch", rate = 0.25 },
+}
 
 -- ============================================
 -- INITIALISATION
@@ -47,7 +65,6 @@ function storage.init(config)
     stats.session.mobsKilled = 0
     stats.session.itemsCollected = 0
     stats.session.raresFound = 0
-    stats.session.lastMobCount = 0
     
     utils.log("Storage initialisé avec " .. #sortingRules .. " règles de tri")
 end
@@ -94,7 +111,6 @@ function storage.resetSession()
     stats.session.mobsKilled = 0
     stats.session.itemsCollected = 0
     stats.session.raresFound = 0
-    stats.session.lastMobCount = 0
     
     storage.saveStats()
 end
@@ -105,8 +121,7 @@ function storage.resetAll()
             startTime = os.epoch("utc") / 1000,
             mobsKilled = 0,
             itemsCollected = 0,
-            raresFound = 0,
-            lastMobCount = 0
+            raresFound = 0
         },
         total = {
             mobsKilled = 0,
@@ -136,7 +151,6 @@ function storage.recordHourlyStats()
     local toRemove = {}
     
     for hour, _ in pairs(stats.hourly) do
-        -- Parser l'heure
         local y, m, d, h = hour:match("(%d+)-(%d+)-(%d+)-(%d+)")
         if y then
             local timestamp = os.time({
@@ -177,7 +191,7 @@ function storage.getHourlyData(hours)
     return data
 end
 
--- Incrémenter le compteur de mobs tués
+-- Incrémenter le compteur de mobs tués (estimation)
 function storage.addKill(count)
     count = count or 1
     stats.session.mobsKilled = stats.session.mobsKilled + count
@@ -236,6 +250,15 @@ function storage.getRecentRares(count)
     return result
 end
 
+-- Estimer les mobs tués depuis un item
+function storage.estimateMobsFromItem(itemName, count)
+    local estimate = MOB_ESTIMATES[itemName]
+    if estimate then
+        return math.floor(count * estimate.rate + 0.5)
+    end
+    return 0
+end
+
 -- ============================================
 -- TRI DES ITEMS
 -- ============================================
@@ -273,6 +296,12 @@ function storage.sortSlot(slot, item)
     
     if transferred > 0 then
         storage.addItems(transferred)
+        
+        -- Estimer les mobs tués
+        local mobEstimate = storage.estimateMobsFromItem(item.name, transferred)
+        if mobEstimate > 0 then
+            storage.addKill(mobEstimate)
+        end
         
         -- Vérifier si item rare
         if utils.isRareItem(item.name, item.nbt) then
@@ -376,23 +405,6 @@ function storage.getStorageStatus()
     end
     
     return status
-end
-
--- ============================================
--- DETECTION MOBS TUES
--- ============================================
-
--- Mettre à jour le compteur de mobs (appelé depuis la boucle principale)
-function storage.updateMobCount(currentCount)
-    local lastCount = stats.session.lastMobCount
-    
-    -- Si le nombre a diminué, des mobs ont été tués
-    if lastCount > currentCount then
-        local killed = lastCount - currentCount
-        storage.addKill(killed)
-    end
-    
-    stats.session.lastMobCount = currentCount
 end
 
 -- ============================================

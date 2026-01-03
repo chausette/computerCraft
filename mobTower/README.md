@@ -1,21 +1,31 @@
-# Mob Tower Manager v1.0
+# Mob Tower Manager v1.1
 
-Un programme ComputerCraft pour gérer et automatiser votre tour à mobs avec Tom's Peripherals.
+Un programme ComputerCraft pour gérer et automatiser votre tour à mobs.
 
-![Version](https://img.shields.io/badge/version-1.0-blue)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.18%2B-green)
-![ComputerCraft](https://img.shields.io/badge/ComputerCraft-Tweaked-orange)
+**Version 1.21 NeoForge** - Compatible avec CC: Tweaked + Advanced Peripherals
+
+![Version](https://img.shields.io/badge/version-1.1-blue)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x-green)
+![Loader](https://img.shields.io/badge/Loader-NeoForge-orange)
 
 ## Fonctionnalités
 
 - 📊 **Dashboard temps réel** sur moniteur 3x2
-- 🔢 **Statistiques complètes** : mobs tués, items collectés, temps actif
+- 🔢 **Statistiques** : mobs tués (estimation), items collectés, temps actif
 - 📈 **Graphique de production** par heure (historique 12h)
 - 📦 **Tri automatique** des drops vers les barils
 - ⚠️ **Alertes visuelles** pour items rares et stockage plein
-- 💡 **Contrôle du spawn** via lampes More Red
+- 💡 **Contrôle du spawn** via redstone (lampes)
+- 👤 **Détection du joueur** avec Player Detector
 - 💾 **Sauvegarde persistante** des statistiques
 - 🧙 **Setup Wizard** pour configuration facile
+
+## Mods Requis
+
+| Mod | Version | Téléchargement |
+|-----|---------|----------------|
+| CC: Tweaked | 1.21.1 | [Modrinth](https://modrinth.com/mod/cc-tweaked) |
+| Advanced Peripherals | 1.21.1 | [CurseForge](https://www.curseforge.com/minecraft/mc-mods/advanced-peripherals) |
 
 ## Matériel Requis
 
@@ -23,14 +33,11 @@ Un programme ComputerCraft pour gérer et automatiser votre tour à mobs avec To
 |----------|------|-------|
 | 1 | Advanced Computer | Exécute le programme |
 | 1 | Monitor 3x2 | Affichage du dashboard |
-| 2 | Entity Sensor (Tom's) | Détection des mobs |
-| 1 | Inventory Manager (Tom's) | Tri des items |
-| 1 | Redstone Integrator (Tom's) | Contrôle des lampes |
+| 1 | Player Detector (AP) | Détecte ta présence |
 | 1 | Double Coffre | Coffre collecteur |
 | 23 | Barils | Stockage trié |
 | - | Wired Modems | Connexion réseau |
 | - | Network Cables | Connexion réseau |
-| - | Bundled Cable (More Red) | Contrôle lampes |
 
 ## Installation
 
@@ -54,14 +61,11 @@ wget run https://raw.githubusercontent.com/chausette/computerCraft/master/mobTow
 
 Au premier lancement, le **Setup Wizard** vous guidera pour :
 
-1. Sélectionner l'Entity Sensor du haut (darkroom)
-2. Sélectionner l'Entity Sensor du bas (zone kill)
-3. Sélectionner l'Inventory Manager
-4. Sélectionner le Redstone Integrator
-5. Choisir le côté et la couleur du bundled cable
-6. Sélectionner le moniteur
-7. Sélectionner le coffre collecteur
-8. Attribuer chaque baril à un type d'item
+1. Sélectionner le Player Detector
+2. Sélectionner le moniteur
+3. Configurer la sortie redstone (côté + inversion)
+4. Sélectionner le coffre collecteur
+5. Attribuer chaque baril à un type d'item
 
 ### Configuration manuelle
 
@@ -70,12 +74,13 @@ Vous pouvez modifier `mobTower/config.lua` directement :
 ```lua
 local config = {
     player = {
-        name = "VotrePseudo"  -- Pour la détection du joueur
+        name = "VotrePseudo",
+        detectionRange = 16  -- Portée du Player Detector
     },
     
     redstone = {
-        side = "back",       -- Côté du bundled cable
-        color = "white"      -- Couleur du câble
+        side = "back",       -- Côté de sortie redstone
+        inverted = false     -- Inverser le signal
     },
     
     display = {
@@ -106,30 +111,41 @@ local config = {
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ ⚔ MOB TOWER v1.0        [ON ]    ⏱ Session: 02:34  │
-├─────────────────────────┬───────────────────────────┤
-│ STATS EN DIRECT      ●  │ PRODUCTION /HEURE         │
-│                         │ Max: 847/h                │
-│ Mobs attente:      12   │                           │
-│ Tués session:   1,247   │ ▄▆█▇▅▃▆█▇▅▄▆█▇           │
-│ Tués total:    45,832   │ -12h              now     │
-│                         │                           │
-│ Items session:  3,892   │                           │
-│ Items total:  142,847   │                           │
-├─────────────────────────┼───────────────────────────┤
-│ STOCKAGE                │ ★ ITEMS RARES             │
-│                         │                           │
-│ [████████░░░] 76%       │ ● Zombie Head      14:32  │
-│                         │ ● Diamond Sword    14:21  │
-│ ⚠ Rotten Flesh: 94%     │ ● Iron Armor       13:58  │
-├─────────────────────────┴───────────────────────────┤
-│ [S] Spawn  [C] Config  [R] Reset  [Q] Quitter       │
+│ # MOB TOWER v1.1        [ON ]    Session: 02:34:15 │
+├─────────────────────────────────────────────────────┤
+│ STATISTIQUES     *   │ PRODUCTION /HEURE           │
+│                      │ Max: ~847/h                 │
+│ Mobs session: ~1,247 │                             │
+│ Mobs total:  ~45,832 │ ▄▆█▇▅▃▆█▇▅▄▆█▇             │
+│                      │ -12h              now       │
+│ Items session: 3,892 │                             │
+│ Items total: 142,847 │                             │
+│ Rares:             3 │                             │
+├──────────────────────┼─────────────────────────────┤
+│ STOCKAGE             │ * ITEMS RARES               │
+│                      │                             │
+│ [████████░░░] 76%    │ > Zombie Head      14:32   │
+│                      │ > Diamond Sword    14:21   │
+│ > Rotten Flesh: 94%  │ > Iron Armor       13:58   │
+├──────────────────────┴─────────────────────────────┤
+│ [S] Spawn  [C] Config  [R] Reset  [Q] Quitter      │
 └─────────────────────────────────────────────────────┘
 ```
 
-### Items triés automatiquement
+**Note :** Le symbole `~` indique une estimation (les mobs sont comptés via les drops).
 
-Le programme peut trier automatiquement :
+### Comment fonctionne l'estimation des mobs
+
+Sans Entity Sensor (non disponible en 1.21), le programme estime les mobs tués en comptant les items collectés :
+
+| Item | Estimation |
+|------|------------|
+| 1 Rotten Flesh | ~1 Zombie |
+| 2 Bones | ~1 Skeleton |
+| 1 Gunpowder | ~1 Creeper |
+| 1 Ender Pearl | ~1 Enderman |
+
+### Items triés automatiquement
 
 **Drops de mobs :**
 - Rotten Flesh, Iron Ingot, Carrot, Potato (Zombie)
@@ -137,7 +153,6 @@ Le programme peut trier automatiquement :
 - Gunpowder (Creeper/Witch)
 - Ender Pearl (Enderman)
 - Redstone, Glowstone, Sugar, Glass Bottle, Stick (Witch)
-- String (Spider - si activé)
 
 **Équipements :**
 - Casques, Plastrons, Jambières, Bottes (toutes matières)
@@ -188,31 +203,37 @@ Activez HTTP dans la config du mod :
 2. Mettez `http_enable = true`
 3. Redémarrez le serveur
 
-### "Aucun Entity Sensor trouvé"
+### "Aucun Player Detector trouvé"
 
-- Vérifiez que les sensors sont connectés avec des wired modems
-- Vérifiez que les modems sont activés (clic droit)
-- Vérifiez que le network cable relie tout à l'ordinateur
-
-### Les mobs ne sont pas comptés
-
-- Vérifiez que votre pseudo est correct dans la config
-- Vérifiez que l'Entity Sensor du bas est dans la zone de kill
-- Assurez-vous d'être à portée du sensor (8 blocs par défaut)
+- Vérifiez qu'Advanced Peripherals est installé
+- Vérifiez que le Player Detector est connecté avec un wired modem
+- Vérifiez que le modem est activé (clic droit)
 
 ### Le tri ne fonctionne pas
 
-- Vérifiez que l'Inventory Manager est connecté au réseau
 - Vérifiez que tous les barils ont un wired modem activé
 - Vérifiez que le coffre collecteur est bien configuré
+- Vérifiez les logs dans `mobTower/data/debug.log`
+
+### Les lampes ne répondent pas
+
+- Vérifiez le côté configuré pour la redstone
+- Essayez d'inverser le signal dans la config
+- Assurez-vous que la redstone est bien connectée aux lampes
+
+## Limitations (Version 1.21)
+
+⚠️ Cette version est adaptée pour Minecraft 1.21 où certains mods ne sont pas disponibles :
+
+- **Pas d'Entity Sensor** : Les mobs ne peuvent pas être comptés directement. Le programme estime les kills à partir des drops collectés.
+- **Pas de Redstone Integrator** : La redstone sort directement du computer (un seul côté disponible).
 
 ## Crédits
 
 - **Auteur** : MikeChausette
-- **Mods requis** : 
+- **Mods utilisés** : 
   - CC: Tweaked
-  - Tom's Peripherals
-  - More Red (optionnel, pour les lampes)
+  - Advanced Peripherals
 
 ## Licence
 

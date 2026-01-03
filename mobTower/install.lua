@@ -1,5 +1,6 @@
 -- ============================================
--- MOB TOWER MANAGER - Installer
+-- MOB TOWER MANAGER v1.1 - Installer
+-- Version 1.21 NeoForge
 -- Telecharge et installe depuis GitHub
 -- ============================================
 
@@ -33,7 +34,8 @@ local function header()
     
     setColor(colors.cyan)
     print("============================================")
-    print("   MOB TOWER MANAGER - Installer v1.0")
+    print("   MOB TOWER MANAGER v1.1 - Installer")
+    print("   Version 1.21 NeoForge")
     print("============================================")
     setColor(colors.white)
     print("")
@@ -80,7 +82,7 @@ local function checkHTTP()
         print("")
         setColor(colors.yellow)
         print("Pour activer HTTP:")
-        print("1. Ouvrez le fichier computercraft.cfg")
+        print("1. Ouvrez computercraft-server.toml")
         print("2. Trouvez 'http_enable'")
         print("3. Mettez-le a true")
         print("4. Redemarrez le serveur")
@@ -123,6 +125,14 @@ local function install(update)
         setColor(colors.lime)
         print("INSTALLATION")
     end
+    setColor(colors.white)
+    print("")
+    
+    -- Info mods requis
+    setColor(colors.cyan)
+    print("Mods requis:")
+    print("  - CC: Tweaked")
+    print("  - Advanced Peripherals")
     setColor(colors.white)
     print("")
     
@@ -230,6 +240,13 @@ local function install(update)
             setColor(colors.yellow)
             print("Le Setup Wizard se lancera au premier")
             print("demarrage pour configurer les peripheriques.")
+            print("")
+            print("Materiel necessaire:")
+            print("  - 1x Player Detector")
+            print("  - 1x Monitor 3x2")
+            print("  - 1x Double coffre (collecteur)")
+            print("  - 23x Barils (tri)")
+            print("  - Wired modems + cables")
         end
     else
         setColor(colors.red)
