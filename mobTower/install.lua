@@ -1,5 +1,5 @@
 -- ============================================
--- MOB TOWER MANAGER v1.1 - Installer
+-- MOB TOWER MANAGER v1.2 - Installer
 -- Version 1.21 NeoForge
 -- ============================================
 

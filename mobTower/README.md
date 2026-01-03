@@ -1,10 +1,10 @@
-# 🗼 Mob Tower Manager v1.1
+# 🗼 Mob Tower Manager v1.2
 
 Un programme ComputerCraft pour gérer et automatiser votre tour à mobs.
 
 **Compatible Minecraft 1.21.x NeoForge**
 
-![Version](https://img.shields.io/badge/version-1.1-blue)
+![Version](https://img.shields.io/badge/version-1.2-blue)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.x-green)
 ![Loader](https://img.shields.io/badge/Loader-NeoForge-orange)
 
@@ -13,13 +13,23 @@ Un programme ComputerCraft pour gérer et automatiser votre tour à mobs.
 ## ✨ Fonctionnalités
 
 - 📊 **Dashboard temps réel** sur moniteur
+- 🖱️ **Interface tactile** - touchez le moniteur pour interagir !
 - 🔢 **Statistiques** : mobs tués (estimation), items collectés
 - 📈 **Graphique de production** par heure
 - 📦 **Tri automatique** des drops vers les barils
 - ⚠️ **Alertes visuelles** pour items rares
-- 💡 **Contrôle du spawn** via redstone
+- 💡 **Contrôle du spawn** via bouton tactile
 - 👤 **Détection du joueur** (optionnel)
 - 💾 **Sauvegarde automatique** des stats
+
+---
+
+## 🆕 Nouveautés v1.2
+
+- ✅ **Boutons tactiles** sur le moniteur (plus besoin du clavier !)
+- ✅ **Plus d'items triés** : arcs, potions, outils, armures
+- ✅ Support `player_detector` (Advanced Peripherals 1.21)
+- ✅ Shulker boxes reconnues comme inventaires
 
 ---
 
@@ -104,7 +114,18 @@ Appuie sur `C` dans le programme, puis `O` pour relancer le wizard.
 
 ## 🎮 Utilisation
 
-### Raccourcis clavier
+### 🖱️ Interface tactile (NOUVEAU !)
+
+**Touchez directement le moniteur** pour interagir :
+
+| Bouton | Action |
+|--------|--------|
+| `ON/OFF` (en haut) | Toggle spawn ON/OFF |
+| `CONFIG` | Reconfigurer |
+| `RESET` | Reset statistiques de session |
+| `QUITTER` | Arrêter le programme |
+
+### ⌨️ Raccourcis clavier (si terminal actif)
 
 | Touche | Action |
 |--------|--------|
@@ -156,18 +177,41 @@ C'est pourquoi les stats affichent `~` devant le nombre de mobs.
 
 ## 📦 Items triés automatiquement
 
+### Drops de mobs
 - **Zombie** : Rotten Flesh, Iron Ingot, Carrot, Potato
 - **Skeleton** : Bone, Arrow
 - **Creeper** : Gunpowder
 - **Enderman** : Ender Pearl
 - **Spider** : String, Spider Eye
 - **Witch** : Redstone, Glowstone, Sugar, Glass Bottle, Stick
+- **Slime** : Slime Ball
+- **Phantom** : Phantom Membrane
+- **Blaze** : Blaze Rod
+- **Ghast** : Ghast Tear
+
+### Armes & Outils (tous types)
+- 🏹 **Arcs** : Bow, Crossbow
+- ⚔️ **Épées** : toutes matières
+- ⛏️ **Pioches** : toutes matières
+- 🪓 **Haches** : toutes matières
+- 🔨 **Pelles** : toutes matières
+- 🌾 **Houes** : toutes matières
+
+### Armures (tous types)
+- 🪖 Casques
+- 🦺 Plastrons
+- 🩳 Jambières
+- 👢 Bottes
+
+### Potions
+- 🧪 Potions normales
+- 💥 Potions Splash
+- 💨 Potions Lingering
 
 ### Items rares (avec alerte)
-
-- 💀 Têtes de mob
+- 💀 Têtes de mob / Crânes
 - 💿 Music Discs
-- ⚔️ Équipements enchantés
+- ✨ Items enchantés
 
 ---
 
@@ -241,6 +285,13 @@ Active HTTP dans la config du mod :
 ---
 
 ## 📜 Changelog
+
+### v1.2 (1.21 NeoForge)
+- ✅ **Boutons tactiles** sur le moniteur !
+- ✅ **Plus d'items** : arcs, crossbow, potions, outils, armures
+- ✅ Support `player_detector` (underscore)
+- ✅ Shulker boxes comme inventaires
+- ✅ Amélioration de l'interface
 
 ### v1.1 (1.21 NeoForge)
 - ✅ Compatible Minecraft 1.21.x

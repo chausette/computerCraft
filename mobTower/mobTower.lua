@@ -1,11 +1,11 @@
 -- ============================================
--- MOB TOWER MANAGER v1.1 - TOUT EN UN
--- Version 1.21 NeoForge
--- Colle ce fichier entier dans /mobTower/mobTower.lua
+-- MOB TOWER MANAGER v1.2
+-- Version 1.21 NeoForge - TOUT EN UN
+-- Avec boutons tactiles sur moniteur
 -- ============================================
 
 -- ============================================
--- UTILS (intégré)
+-- UTILS
 -- ============================================
 
 local utils = {}
@@ -19,22 +19,31 @@ utils.RARE_ITEMS = {
     ["minecraft:wither_skeleton_skull"] = true,
     ["minecraft:music_disc_13"] = true,
     ["minecraft:music_disc_cat"] = true,
+    ["minecraft:music_disc_blocks"] = true,
+    ["minecraft:music_disc_chirp"] = true,
+    ["minecraft:music_disc_far"] = true,
+    ["minecraft:music_disc_mall"] = true,
+    ["minecraft:music_disc_mellohi"] = true,
+    ["minecraft:music_disc_stal"] = true,
+    ["minecraft:music_disc_strad"] = true,
+    ["minecraft:music_disc_ward"] = true,
+    ["minecraft:music_disc_11"] = true,
+    ["minecraft:music_disc_wait"] = true,
     ["minecraft:trident"] = true,
     ["minecraft:totem_of_undying"] = true,
+    ["minecraft:enchanted_golden_apple"] = true,
+    ["minecraft:nether_star"] = true,
 }
 
 function utils.isRareItem(itemName, nbt)
     if utils.RARE_ITEMS[itemName] then return true end
     if nbt and (nbt.Enchantments or nbt.StoredEnchantments) then return true end
-    if string.find(itemName, "_helmet") or string.find(itemName, "_chestplate") or
-       string.find(itemName, "_leggings") or string.find(itemName, "_boots") or
-       string.find(itemName, "_sword") or string.find(itemName, "bow") then
-        return true
-    end
     return false
 end
 
+-- Liste étendue des items à trier
 utils.SORTABLE_ITEMS = {
+    -- Drops de mobs
     { id = "minecraft:rotten_flesh", name = "Rotten Flesh" },
     { id = "minecraft:bone", name = "Bone" },
     { id = "minecraft:arrow", name = "Arrow" },
@@ -42,14 +51,50 @@ utils.SORTABLE_ITEMS = {
     { id = "minecraft:ender_pearl", name = "Ender Pearl" },
     { id = "minecraft:string", name = "String" },
     { id = "minecraft:spider_eye", name = "Spider Eye" },
+    { id = "minecraft:slime_ball", name = "Slime Ball" },
+    { id = "minecraft:phantom_membrane", name = "Phantom Membrane" },
+    { id = "minecraft:blaze_rod", name = "Blaze Rod" },
+    { id = "minecraft:ghast_tear", name = "Ghast Tear" },
+    { id = "minecraft:magma_cream", name = "Magma Cream" },
+    
+    -- Drops Witch
     { id = "minecraft:redstone", name = "Redstone" },
     { id = "minecraft:glowstone_dust", name = "Glowstone" },
     { id = "minecraft:sugar", name = "Sugar" },
     { id = "minecraft:glass_bottle", name = "Glass Bottle" },
     { id = "minecraft:stick", name = "Stick" },
+    
+    -- Drops Zombie
     { id = "minecraft:iron_ingot", name = "Iron Ingot" },
     { id = "minecraft:carrot", name = "Carrot" },
     { id = "minecraft:potato", name = "Potato" },
+    
+    -- Arcs
+    { id = "minecraft:bow", name = "Bow" },
+    { id = "minecraft:crossbow", name = "Crossbow" },
+    
+    -- Potions (patterns)
+    { id = "potion", name = "Potions (toutes)", pattern = true },
+    { id = "splash_potion", name = "Potions Splash", pattern = true },
+    { id = "lingering_potion", name = "Potions Lingering", pattern = true },
+    
+    -- Armures (patterns)
+    { id = "_helmet", name = "Casques (tous)", pattern = true },
+    { id = "_chestplate", name = "Plastrons (tous)", pattern = true },
+    { id = "_leggings", name = "Jambieres (tous)", pattern = true },
+    { id = "_boots", name = "Bottes (tous)", pattern = true },
+    
+    -- Outils (patterns)
+    { id = "_sword", name = "Epees (toutes)", pattern = true },
+    { id = "_pickaxe", name = "Pioches (toutes)", pattern = true },
+    { id = "_axe", name = "Haches (toutes)", pattern = true },
+    { id = "_shovel", name = "Pelles (toutes)", pattern = true },
+    { id = "_hoe", name = "Houes (toutes)", pattern = true },
+    
+    -- Items rares
+    { id = "_head", name = "Tetes de mob", pattern = true },
+    { id = "_skull", name = "Cranes", pattern = true },
+    { id = "music_disc", name = "Disques", pattern = true },
 }
 
 function utils.formatNumber(n)
@@ -120,7 +165,7 @@ function utils.ensureDir(path)
 end
 
 -- ============================================
--- PERIPHERALS (intégré)
+-- PERIPHERALS
 -- ============================================
 
 local peripherals = {}
@@ -152,7 +197,7 @@ function peripherals.listAll()
             table.insert(result.playerDetectors, { name = name, type = pType })
         elseif pType == "monitor" then
             table.insert(result.monitors, { name = name, type = pType })
-        elseif pType and (string.find(pType, "chest") or string.find(pType, "barrel")) then
+        elseif pType and (string.find(pType, "chest") or string.find(pType, "barrel") or string.find(pType, "shulker")) then
             local inv = peripheral.wrap(name)
             if inv and inv.size then
                 local ok, size = pcall(function() return inv.size() end)
@@ -230,8 +275,17 @@ function peripherals.getMonitorSize()
     return pCache.monitor.getSize()
 end
 
+function peripherals.getMonitorName()
+    for _, name in ipairs(peripheral.getNames()) do
+        if peripheral.getType(name) == "monitor" then
+            return name
+        end
+    end
+    return nil
+end
+
 -- ============================================
--- STORAGE (intégré)
+-- STORAGE
 -- ============================================
 
 local storage = {}
@@ -253,6 +307,10 @@ local MOB_ESTIMATES = {
     ["minecraft:ender_pearl"] = 1.0,
     ["minecraft:string"] = 0.5,
     ["minecraft:spider_eye"] = 0.33,
+    ["minecraft:slime_ball"] = 1.0,
+    ["minecraft:blaze_rod"] = 1.0,
+    ["minecraft:ghast_tear"] = 1.0,
+    ["minecraft:phantom_membrane"] = 0.5,
 }
 
 function storage.init(config)
@@ -417,23 +475,29 @@ end
 function storage.recordHourlyStats() end
 
 -- ============================================
--- UI (intégré)
+-- UI avec BOUTONS TACTILES
 -- ============================================
 
 local ui = {}
 local monitor = nil
+local monitorName = nil
 local width, height = 0, 0
 local alertState = { active = false, message = "", startTime = 0, duration = 3 }
+
+-- Définition des boutons
+local buttons = {}
 
 local theme = {
     bg = colors.black, header = colors.blue, headerText = colors.white,
     text = colors.white, textDim = colors.lightGray, accent = colors.cyan,
     success = colors.lime, warning = colors.orange, danger = colors.red,
-    rare = colors.yellow, border = colors.gray, graphBar = colors.lime, graphBg = colors.gray
+    rare = colors.yellow, border = colors.gray, graphBar = colors.lime, graphBg = colors.gray,
+    buttonBg = colors.gray, buttonText = colors.white, buttonActive = colors.lime
 }
 
-function ui.init(mon)
+function ui.init(mon, name)
     monitor = mon
+    monitorName = name
     if monitor then
         monitor.setTextScale(0.5)
         width, height = monitor.getSize()
@@ -447,6 +511,7 @@ function ui.clear()
     if not monitor then return end
     monitor.setBackgroundColor(theme.bg)
     monitor.clear()
+    buttons = {}
 end
 
 function ui.writeLine(x, y, text, fg, bg)
@@ -505,6 +570,51 @@ function ui.drawBarGraph(x, y, w, h, data, maxValue)
     monitor.setBackgroundColor(theme.bg)
 end
 
+-- Dessiner un bouton et l'enregistrer pour le clic
+function ui.drawButton(x, y, w, h, text, id, active)
+    if not monitor then return end
+    
+    local bgColor = active and theme.buttonActive or theme.buttonBg
+    local fgColor = active and theme.bg or theme.buttonText
+    
+    -- Dessiner le fond du bouton
+    for dy = 0, h - 1 do
+        monitor.setCursorPos(x, y + dy)
+        monitor.setBackgroundColor(bgColor)
+        monitor.write(string.rep(" ", w))
+    end
+    
+    -- Centrer le texte
+    local textX = x + math.floor((w - #text) / 2)
+    local textY = y + math.floor(h / 2)
+    monitor.setCursorPos(textX, textY)
+    monitor.setTextColor(fgColor)
+    monitor.setBackgroundColor(bgColor)
+    monitor.write(text)
+    
+    -- Enregistrer le bouton pour la détection de clic
+    table.insert(buttons, {
+        id = id,
+        x1 = x,
+        y1 = y,
+        x2 = x + w - 1,
+        y2 = y + h - 1
+    })
+    
+    monitor.setBackgroundColor(theme.bg)
+end
+
+-- Vérifier si un clic touche un bouton
+function ui.checkButtonClick(clickX, clickY)
+    for _, btn in ipairs(buttons) do
+        if clickX >= btn.x1 and clickX <= btn.x2 and
+           clickY >= btn.y1 and clickY <= btn.y2 then
+            return btn.id
+        end
+    end
+    return nil
+end
+
 function ui.drawHeader(title, spawnOn, sessionTime)
     if not monitor then return end
     monitor.setTextColor(theme.headerText)
@@ -514,14 +624,15 @@ function ui.drawHeader(title, spawnOn, sessionTime)
     monitor.setCursorPos(2, 1)
     monitor.write("# " .. title)
     
-    local spawnText = spawnOn and "[ON ]" or "[OFF]"
-    monitor.setCursorPos(math.floor(width / 2) - 2, 1)
-    monitor.setTextColor(spawnOn and theme.success or theme.danger)
-    monitor.write(spawnText)
+    -- Bouton SPAWN (cliquable)
+    local btnText = spawnOn and " ON " or " OFF"
+    local btnX = math.floor(width / 2) - 3
+    ui.drawButton(btnX, 1, 6, 1, btnText, "spawn", spawnOn)
     
-    local timeText = "Session: " .. utils.formatTime(sessionTime)
-    monitor.setCursorPos(width - #timeText, 1)
+    local timeText = utils.formatTime(sessionTime)
+    monitor.setCursorPos(width - #timeText - 1, 1)
     monitor.setTextColor(theme.headerText)
+    monitor.setBackgroundColor(theme.header)
     monitor.write(timeText)
     monitor.setBackgroundColor(theme.bg)
 end
@@ -601,10 +712,10 @@ function ui.drawRareItems(x, y, rareItems)
         return
     end
     for i, item in ipairs(rareItems) do
-        if i > 5 then break end
+        if i > 4 then break end
         ui.writeLine(x, y, "> ", theme.rare)
-        ui.writeLine(x + 2, y, utils.truncate(utils.getShortName(item.name), 16), theme.text)
-        ui.writeLine(x + 20, y, utils.formatTimestamp(item.time), theme.textDim)
+        ui.writeLine(x + 2, y, utils.truncate(utils.getShortName(item.name), 14), theme.text)
+        ui.writeLine(x + 18, y, utils.formatTimestamp(item.time), theme.textDim)
         y = y + 1
     end
 end
@@ -613,16 +724,21 @@ function ui.drawFooter(y)
     if not monitor then return end
     ui.drawLine(y, "-", theme.border)
     y = y + 1
-    ui.writeLine(2, y, "[S] Spawn", theme.accent)
-    ui.writeLine(14, y, "[C] Config", theme.accent)
-    ui.writeLine(27, y, "[R] Reset", theme.accent)
-    ui.writeLine(39, y, "[Q] Quitter", theme.accent)
+    
+    -- Boutons cliquables en bas
+    local btnWidth = 10
+    local spacing = 2
+    local startX = 2
+    
+    ui.drawButton(startX, y, btnWidth, 1, "CONFIG", "config", false)
+    ui.drawButton(startX + btnWidth + spacing, y, btnWidth, 1, "RESET", "reset", false)
+    ui.drawButton(startX + (btnWidth + spacing) * 2, y, btnWidth, 1, "QUITTER", "quit", false)
 end
 
 function ui.drawMainScreen(data)
     if not monitor then return end
     ui.clear()
-    ui.drawHeader("MOB TOWER v1.1", data.spawnOn, data.sessionTime)
+    ui.drawHeader("MOB TOWER v1.2", data.spawnOn, data.sessionTime)
     ui.drawLine(2)
     local leftCol = 2
     local rightCol = math.floor(width / 2) + 2
@@ -671,12 +787,16 @@ function ui.drawAlert()
     monitor.setBackgroundColor(theme.bg)
 end
 
+function ui.getMonitorName()
+    return monitorName
+end
+
 -- ============================================
 -- CONFIGURATION
 -- ============================================
 
 local config = {
-    version = "1.1",
+    version = "1.2",
     player = { name = "MikeChausette", detectionRange = 16 },
     peripherals = { playerDetector = nil, monitor = nil },
     redstone = { side = "back", inverted = false },
@@ -697,7 +817,7 @@ local function setupWizard()
     term.setCursorPos(1, 1)
     
     print("============================================")
-    print("   MOB TOWER MANAGER v1.1 - Setup Wizard")
+    print("   MOB TOWER MANAGER v1.2 - Setup Wizard")
     print("   Version 1.21 NeoForge")
     print("============================================")
     print("")
@@ -724,11 +844,14 @@ local function setupWizard()
         for i, det in ipairs(allPeripherals.playerDetectors) do
             print("  " .. i .. ". " .. det.name)
         end
+        print("  0. Aucun")
         write("  Choix: ")
         local choice = tonumber(read())
-        if choice and allPeripherals.playerDetectors[choice] then
+        if choice and choice > 0 and allPeripherals.playerDetectors[choice] then
             config.peripherals.playerDetector = allPeripherals.playerDetectors[choice].name
             print("  -> " .. config.peripherals.playerDetector)
+        else
+            print("  -> Aucun")
         end
     end
     
@@ -757,11 +880,19 @@ local function setupWizard()
     print("[5/6] Cote redstone pour lampes")
     local sides = {"top", "bottom", "left", "right", "front", "back"}
     for i, side in ipairs(sides) do print("  " .. i .. ". " .. side) end
-    write("  Choix [1-6]: ")
+    print("  0. Aucun (pas de controle lampes)")
+    write("  Choix [0-6]: ")
     choice = tonumber(read())
-    if choice and sides[choice] then
+    if choice and choice > 0 and sides[choice] then
         config.redstone.side = sides[choice]
         print("  -> " .. config.redstone.side)
+        
+        print("  Inverser signal? (o/n)")
+        local inv = read()
+        config.redstone.inverted = (inv:lower() == "o")
+    else
+        print("  -> Pas de controle lampes")
+        config.redstone.side = nil
     end
     
     -- Coffre collecteur
@@ -774,15 +905,20 @@ local function setupWizard()
         for i, inv in ipairs(allPeripherals.inventories) do
             print("  " .. i .. ". " .. inv.name .. " (" .. inv.size .. " slots)")
         end
+        print("  0. Aucun (pas de tri)")
         write("  Choix: ")
         choice = tonumber(read())
-        if choice and allPeripherals.inventories[choice] then
+        if choice and choice > 0 and allPeripherals.inventories[choice] then
             config.storage.collectorChest = allPeripherals.inventories[choice].name
             print("  -> " .. config.storage.collectorChest)
             
             -- Attribution des barils
             print("")
             print("Attribution des barils (Entree = passer)")
+            print("Conseil: ne configure que les items que")
+            print("tu veux trier!")
+            print("")
+            
             local remaining = {}
             for _, inv in ipairs(allPeripherals.inventories) do
                 if inv.name ~= config.storage.collectorChest then
@@ -793,10 +929,11 @@ local function setupWizard()
             for _, item in ipairs(utils.SORTABLE_ITEMS) do
                 if #remaining == 0 then break end
                 print("")
-                print("  " .. item.name .. " -> quel baril?")
+                print("  " .. item.name)
                 for i, inv in ipairs(remaining) do
                     if i <= 5 then print("    " .. i .. ". " .. inv.name) end
                 end
+                if #remaining > 5 then print("    ... +" .. (#remaining - 5) .. " autres") end
                 write("  Choix [0=passer]: ")
                 choice = tonumber(read())
                 if choice and choice > 0 and remaining[choice] then
@@ -819,6 +956,10 @@ local function setupWizard()
     utils.ensureDir("/mobTower/data")
     utils.saveTable(CONFIG_FILE, config)
     print("Configuration sauvegardee!")
+    print("Regles de tri: " .. #config.storage.sortingRules)
+    print("")
+    print("CONSEIL: Touchez le moniteur pour")
+    print("interagir avec l'interface!")
     print("")
     print("Appuyez sur une touche...")
     os.pullEvent("key")
@@ -859,11 +1000,13 @@ local function initialize()
         return false
     end
     
-    ui.init(peripherals.getMonitor())
+    ui.init(peripherals.getMonitor(), config.peripherals.monitor)
     storage.init(config)
     
     spawnOn = true
-    peripherals.setSpawnOn()
+    if config.redstone.side then
+        peripherals.setSpawnOn()
+    end
     
     return true
 end
@@ -883,35 +1026,23 @@ local function updateDisplay()
     })
 end
 
-local function processInput()
-    local _, key = os.pullEvent("key")
+local function handleMonitorTouch(x, y)
+    local buttonId = ui.checkButtonClick(x, y)
     
-    if key == keys.q then
+    if buttonId == "spawn" then
+        if config.redstone.side then
+            local _, newState = peripherals.toggleSpawn(spawnOn)
+            spawnOn = newState
+        end
+    elseif buttonId == "config" then
+        config.setupComplete = false
+        utils.saveTable(CONFIG_FILE, config)
+        os.reboot()
+    elseif buttonId == "reset" then
+        storage.resetSession()
+        ui.showAlert("Stats reset!", 2)
+    elseif buttonId == "quit" then
         running = false
-    elseif key == keys.s then
-        local _, newState = peripherals.toggleSpawn(spawnOn)
-        spawnOn = newState
-    elseif key == keys.r then
-        term.clear()
-        term.setCursorPos(1, 1)
-        print("Reset stats session? [O/N]")
-        while true do
-            local _, k = os.pullEvent("key")
-            if k == keys.o then storage.resetSession() break
-            elseif k == keys.n then break end
-        end
-    elseif key == keys.c then
-        term.clear()
-        term.setCursorPos(1, 1)
-        print("Reconfigurer? [O/N]")
-        while true do
-            local _, k = os.pullEvent("key")
-            if k == keys.o then
-                config.setupComplete = false
-                utils.saveTable(CONFIG_FILE, config)
-                os.reboot()
-            elseif k == keys.n then break end
-        end
     end
 end
 
@@ -942,13 +1073,37 @@ local function mainLoop()
         autoSave()
         
         local timer = os.startTimer(config.display.refreshRate)
+        
         while true do
-            local event, p1 = os.pullEvent()
-            if event == "timer" and p1 == timer then break
+            local event, p1, p2, p3 = os.pullEvent()
+            
+            if event == "timer" and p1 == timer then
+                break
+            elseif event == "monitor_touch" then
+                -- p1 = monitor name, p2 = x, p3 = y
+                if p1 == config.peripherals.monitor then
+                    os.cancelTimer(timer)
+                    handleMonitorTouch(p2, p3)
+                    break
+                end
             elseif event == "key" then
                 os.cancelTimer(timer)
-                os.queueEvent("key", p1)
-                processInput()
+                -- Raccourcis clavier (si terminal actif)
+                if p1 == keys.q then
+                    running = false
+                elseif p1 == keys.s then
+                    if config.redstone.side then
+                        local _, newState = peripherals.toggleSpawn(spawnOn)
+                        spawnOn = newState
+                    end
+                elseif p1 == keys.r then
+                    storage.resetSession()
+                    ui.showAlert("Stats reset!", 2)
+                elseif p1 == keys.c then
+                    config.setupComplete = false
+                    utils.saveTable(CONFIG_FILE, config)
+                    os.reboot()
+                end
                 break
             end
         end
@@ -961,7 +1116,7 @@ end
 
 term.clear()
 term.setCursorPos(1, 1)
-print("Mob Tower Manager v1.1")
+print("Mob Tower Manager v1.2")
 print("Chargement...")
 
 if not initialize() then
@@ -971,10 +1126,19 @@ end
 
 term.clear()
 term.setCursorPos(1, 1)
-print("Mob Tower Manager actif!")
-print("Regardez le moniteur.")
+print("Mob Tower Manager v1.2 actif!")
 print("")
-print("S=Spawn C=Config R=Reset Q=Quitter")
+print(">>> TOUCHEZ LE MONITEUR <<<")
+print("pour interagir avec l'interface")
+print("")
+print("Boutons disponibles:")
+print("  - ON/OFF : Toggle lampes")
+print("  - CONFIG : Reconfigurer")
+print("  - RESET  : Reset stats")
+print("  - QUITTER: Arreter")
+print("")
+print("Raccourcis clavier (si terminal actif):")
+print("  S=Spawn C=Config R=Reset Q=Quitter")
 
 pcall(mainLoop)
 storage.saveStats()
