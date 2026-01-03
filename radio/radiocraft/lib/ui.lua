@@ -258,10 +258,12 @@ function UI:drawJukebox(player, rcmFiles)
                 end
                 self:text(2, y, string.format("%s %s", source, displayName), fg, bg)
                 
+                -- Utilise l'index numérique directement dans le bouton
                 table.insert(self.buttons, {
-                    id = "rcm_" .. idx,
+                    id = "play_rcm",
                     x1 = 2, y1 = y,
-                    x2 = self.width - 1, y2 = y
+                    x2 = self.width - 1, y2 = y,
+                    data = {index = idx}
                 })
                 
                 y = y + 1
@@ -486,7 +488,7 @@ function UI:handleClick(x, y)
     -- Cherche dans les boutons
     for _, btn in ipairs(self.buttons) do
         if x >= btn.x1 and x <= btn.x2 and y >= btn.y1 and y <= btn.y2 then
-            return btn.id
+            return btn.id, nil, btn.data
         end
     end
     

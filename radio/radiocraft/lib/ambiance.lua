@@ -10,86 +10,59 @@ Ambiance.STATIONS = {
         name = "Nature",
         icon = "*",
         sounds = {
-            {sound = "minecraft:ambient.cave", weight = 1, minDelay = 100, maxDelay = 300},
-            {sound = "minecraft:entity.bat.ambient", weight = 2, minDelay = 60, maxDelay = 200},
-            {sound = "minecraft:entity.bee.loop", weight = 1, minDelay = 200, maxDelay = 400},
-            {sound = "minecraft:entity.parrot.ambient", weight = 2, minDelay = 80, maxDelay = 180},
-            {sound = "minecraft:entity.wolf.ambient", weight = 1, minDelay = 150, maxDelay = 350},
-            {sound = "minecraft:entity.chicken.ambient", weight = 2, minDelay = 60, maxDelay = 150},
+            {sound = "minecraft:entity.chicken.ambient", weight = 3, minDelay = 20, maxDelay = 60},
+            {sound = "minecraft:entity.cow.ambient", weight = 2, minDelay = 30, maxDelay = 80},
+            {sound = "minecraft:entity.pig.ambient", weight = 2, minDelay = 30, maxDelay = 80},
+            {sound = "minecraft:entity.wolf.ambient", weight = 1, minDelay = 50, maxDelay = 120},
         }
     },
     cave = {
         name = "Grotte",
         icon = "O",
         sounds = {
-            {sound = "minecraft:ambient.cave", weight = 5, minDelay = 40, maxDelay = 120},
-            {sound = "minecraft:entity.bat.ambient", weight = 3, minDelay = 40, maxDelay = 120},
-            {sound = "minecraft:entity.bat.takeoff", weight = 1, minDelay = 100, maxDelay = 250},
-            {sound = "minecraft:block.stone.break", weight = 2, minDelay = 80, maxDelay = 200},
+            {sound = "minecraft:ambient.cave", weight = 3, minDelay = 30, maxDelay = 80},
+            {sound = "minecraft:entity.bat.ambient", weight = 3, minDelay = 20, maxDelay = 60},
+            {sound = "minecraft:block.stone.break", weight = 2, minDelay = 40, maxDelay = 100},
         }
     },
     nether = {
         name = "Nether",
         icon = "!",
         sounds = {
-            {sound = "minecraft:ambient.nether_wastes.loop", weight = 3, minDelay = 100, maxDelay = 200},
-            {sound = "minecraft:entity.ghast.ambient", weight = 2, minDelay = 80, maxDelay = 200},
-            {sound = "minecraft:entity.blaze.ambient", weight = 2, minDelay = 60, maxDelay = 150},
-            {sound = "minecraft:entity.piglin.ambient", weight = 1, minDelay = 100, maxDelay = 250},
-            {sound = "minecraft:block.fire.ambient", weight = 4, minDelay = 30, maxDelay = 80},
-        }
-    },
-    ocean = {
-        name = "Ocean",
-        icon = "~",
-        sounds = {
-            {sound = "minecraft:ambient.underwater.loop", weight = 5, minDelay = 80, maxDelay = 160},
-            {sound = "minecraft:entity.dolphin.ambient_water", weight = 2, minDelay = 80, maxDelay = 180},
-            {sound = "minecraft:entity.fish.swim", weight = 3, minDelay = 40, maxDelay = 100},
-            {sound = "minecraft:entity.squid.ambient", weight = 2, minDelay = 60, maxDelay = 150},
-        }
-    },
-    rain = {
-        name = "Pluie",
-        icon = ",",
-        sounds = {
-            {sound = "minecraft:weather.rain", weight = 5, minDelay = 40, maxDelay = 80},
-            {sound = "minecraft:weather.rain.above", weight = 4, minDelay = 60, maxDelay = 120},
-            {sound = "minecraft:entity.lightning_bolt.thunder", weight = 1, minDelay = 200, maxDelay = 600},
+            {sound = "minecraft:entity.ghast.ambient", weight = 2, minDelay = 40, maxDelay = 100},
+            {sound = "minecraft:entity.blaze.ambient", weight = 2, minDelay = 30, maxDelay = 80},
+            {sound = "minecraft:entity.piglin.ambient", weight = 2, minDelay = 30, maxDelay = 80},
+            {sound = "minecraft:block.fire.ambient", weight = 3, minDelay = 20, maxDelay = 50},
         }
     },
     spooky = {
         name = "Horreur",
         icon = "X",
         sounds = {
-            {sound = "minecraft:ambient.cave", weight = 4, minDelay = 30, maxDelay = 80},
-            {sound = "minecraft:entity.ghast.scream", weight = 1, minDelay = 150, maxDelay = 400},
-            {sound = "minecraft:entity.phantom.ambient", weight = 2, minDelay = 80, maxDelay = 200},
-            {sound = "minecraft:entity.zombie.ambient", weight = 2, minDelay = 60, maxDelay = 150},
-            {sound = "minecraft:entity.skeleton.ambient", weight = 2, minDelay = 70, maxDelay = 160},
-            {sound = "minecraft:entity.witch.ambient", weight = 1, minDelay = 100, maxDelay = 250},
+            {sound = "minecraft:ambient.cave", weight = 3, minDelay = 20, maxDelay = 50},
+            {sound = "minecraft:entity.zombie.ambient", weight = 2, minDelay = 30, maxDelay = 70},
+            {sound = "minecraft:entity.skeleton.ambient", weight = 2, minDelay = 30, maxDelay = 70},
+            {sound = "minecraft:entity.creeper.primed", weight = 1, minDelay = 60, maxDelay = 150},
         }
     },
     village = {
         name = "Village",
         icon = "^",
         sounds = {
-            {sound = "minecraft:entity.villager.ambient", weight = 4, minDelay = 40, maxDelay = 100},
-            {sound = "minecraft:entity.villager.trade", weight = 2, minDelay = 80, maxDelay = 180},
-            {sound = "minecraft:block.anvil.use", weight = 1, minDelay = 120, maxDelay = 300},
-            {sound = "minecraft:entity.chicken.ambient", weight = 3, minDelay = 50, maxDelay = 120},
-            {sound = "minecraft:entity.cow.ambient", weight = 2, minDelay = 60, maxDelay = 140},
-            {sound = "minecraft:entity.pig.ambient", weight = 2, minDelay = 70, maxDelay = 150},
+            {sound = "minecraft:entity.villager.ambient", weight = 4, minDelay = 15, maxDelay = 40},
+            {sound = "minecraft:entity.villager.trade", weight = 2, minDelay = 30, maxDelay = 70},
+            {sound = "minecraft:entity.chicken.ambient", weight = 3, minDelay = 20, maxDelay = 50},
+            {sound = "minecraft:entity.cow.ambient", weight = 2, minDelay = 25, maxDelay = 60},
         }
     },
     peaceful = {
         name = "Calme",
         icon = "-",
         sounds = {
-            {sound = "minecraft:block.amethyst_block.chime", weight = 3, minDelay = 60, maxDelay = 150},
-            {sound = "minecraft:block.note_block.harp", weight = 2, minDelay = 80, maxDelay = 180},
-            {sound = "minecraft:block.note_block.chime", weight = 2, minDelay = 100, maxDelay = 220},
-            {sound = "minecraft:entity.experience_orb.pickup", weight = 1, minDelay = 150, maxDelay = 300},
+            {sound = "minecraft:block.note_block.harp", weight = 4, minDelay = 15, maxDelay = 40},
+            {sound = "minecraft:block.note_block.chime", weight = 3, minDelay = 20, maxDelay = 50},
+            {sound = "minecraft:block.note_block.bell", weight = 2, minDelay = 25, maxDelay = 60},
+            {sound = "minecraft:entity.experience_orb.pickup", weight = 2, minDelay = 30, maxDelay = 70},
         }
     }
 }
@@ -135,11 +108,14 @@ function Ambiance:play(stationId)
     }
     self.isPlaying = true
     
-    -- Initialise les timers pour chaque son
+    -- Initialise les timers pour chaque son (démarrer rapidement)
     self.soundTimers = {}
     for i, soundDef in ipairs(station.sounds) do
-        self.soundTimers[i] = math.random(soundDef.minDelay, soundDef.maxDelay)
+        -- Premier son plus rapide pour feedback immédiat
+        self.soundTimers[i] = math.random(5, 20)
     end
+    
+    print("[Ambiance] Station '" .. station.name .. "' demarree")
     
     if self.onStationChange then
         self.onStationChange(self.currentStation)

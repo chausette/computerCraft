@@ -298,10 +298,10 @@ local function handleButton(buttonId, touchX, touchData)
             end
         end
     
-    -- Fichiers RCM
-    elseif string.match(buttonId, "^rcm_") then
-        local idx = tonumber(buttonId:gsub("rcm_", ""))
-        if idx and rcmFiles[idx] then
+    -- Fichiers RCM (via data.index)
+    elseif buttonId == "play_rcm" and touchData and touchData.index then
+        local idx = touchData.index
+        if rcmFiles[idx] then
             local rcm = rcmFiles[idx]
             local ok, err = player:playRCM(rcm.path)
             if ok then
@@ -394,8 +394,7 @@ print("Demarrage de l'interface...")
 print("Appuyez sur Q dans le terminal pour quitter")
 
 local running = true
-local lastUpdate = os.clock()
-local tickInterval = 0.05 -- 20 ticks par seconde
+local tickTimer = os.startTimer(0.05)  -- Timer pour les updates
 
 -- Premier affichage
 ui:draw(player, ambiance, composer, speakers, rcmFiles)
@@ -407,10 +406,23 @@ while running do
         ui:draw(player, ambiance, composer, speakers, rcmFiles)
     end
     
-    -- Attend un evenement avec timeout
+    -- Attend un evenement
     local event, p1, p2, p3 = os.pullEvent()
     
-    if event == "monitor_touch" then
+    if event == "timer" and p1 == tickTimer then
+        -- Timer tick - update le player et l'ambiance
+        player:update()
+        ambiance:update()
+        
+        -- Relance le timer
+        tickTimer = os.startTimer(0.05)
+        
+        -- Rafraichit l'affichage si en lecture
+        if player:isPlaying() or ambiance:getIsPlaying() then
+            ui:draw(player, ambiance, composer, speakers, rcmFiles)
+        end
+    
+    elseif event == "monitor_touch" then
         -- Clic sur le moniteur
         local x, y = p2, p3
         local buttonId, touchX, touchData = ui:handleClick(x, y)
@@ -458,22 +470,6 @@ while running do
         print("[RadioCraft] Disquette retiree")
         rcmFiles = listRCMFiles()  -- Rafraichit la liste
         ui:draw(player, ambiance, composer, speakers, rcmFiles)
-    
-    elseif event == "timer" or event == "alarm" then
-        -- Rien
-    end
-    
-    -- Update periodique
-    local now = os.clock()
-    if now - lastUpdate >= tickInterval then
-        player:update()
-        ambiance:update()
-        lastUpdate = now
-        
-        -- Rafraichit l'affichage si en lecture
-        if player:isPlaying() or ambiance:getIsPlaying() then
-            ui:draw(player, ambiance, composer, speakers, rcmFiles)
-        end
     end
 end
 
