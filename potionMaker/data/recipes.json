@@ -1,0 +1,215 @@
+{
+  "bases": {
+    "awkward": {
+      "id": "minecraft:potion",
+      "nbt": "Potion:\"minecraft:awkward\"",
+      "name": "Potion etrange",
+      "ingredient": "minecraft:nether_wart",
+      "base": "water_bottle"
+    },
+    "mundane": {
+      "id": "minecraft:potion",
+      "nbt": "Potion:\"minecraft:mundane\"",
+      "name": "Potion banale",
+      "ingredient": "minecraft:redstone",
+      "base": "water_bottle"
+    },
+    "thick": {
+      "id": "minecraft:potion",
+      "nbt": "Potion:\"minecraft:thick\"",
+      "name": "Potion epaisse",
+      "ingredient": "minecraft:glowstone_dust",
+      "base": "water_bottle"
+    }
+  },
+  "potions": {
+    "healing": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:healing\"",
+      "nbt_strong": "Potion:\"minecraft:strong_healing\"",
+      "name": "Potion de soin",
+      "ingredient": "minecraft:glistering_melon_slice",
+      "base": "awkward",
+      "can_extend": false,
+      "can_amplify": true
+    },
+    "regeneration": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:regeneration\"",
+      "nbt_long": "Potion:\"minecraft:long_regeneration\"",
+      "nbt_strong": "Potion:\"minecraft:strong_regeneration\"",
+      "name": "Potion de regeneration",
+      "ingredient": "minecraft:ghast_tear",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": true
+    },
+    "strength": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:strength\"",
+      "nbt_long": "Potion:\"minecraft:long_strength\"",
+      "nbt_strong": "Potion:\"minecraft:strong_strength\"",
+      "name": "Potion de force",
+      "ingredient": "minecraft:blaze_powder",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": true
+    },
+    "swiftness": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:swiftness\"",
+      "nbt_long": "Potion:\"minecraft:long_swiftness\"",
+      "nbt_strong": "Potion:\"minecraft:strong_swiftness\"",
+      "name": "Potion de rapidite",
+      "ingredient": "minecraft:sugar",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": true
+    },
+    "leaping": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:leaping\"",
+      "nbt_long": "Potion:\"minecraft:long_leaping\"",
+      "nbt_strong": "Potion:\"minecraft:strong_leaping\"",
+      "name": "Potion de saut",
+      "ingredient": "minecraft:rabbit_foot",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": true
+    },
+    "fire_resistance": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:fire_resistance\"",
+      "nbt_long": "Potion:\"minecraft:long_fire_resistance\"",
+      "name": "Potion de resistance au feu",
+      "ingredient": "minecraft:magma_cream",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": false
+    },
+    "water_breathing": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:water_breathing\"",
+      "nbt_long": "Potion:\"minecraft:long_water_breathing\"",
+      "name": "Potion de respiration aquatique",
+      "ingredient": "minecraft:pufferfish",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": false
+    },
+    "night_vision": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:night_vision\"",
+      "nbt_long": "Potion:\"minecraft:long_night_vision\"",
+      "name": "Potion de vision nocturne",
+      "ingredient": "minecraft:golden_carrot",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": false
+    },
+    "invisibility": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:invisibility\"",
+      "nbt_long": "Potion:\"minecraft:long_invisibility\"",
+      "name": "Potion d'invisibilite",
+      "ingredient": "minecraft:fermented_spider_eye",
+      "base": "night_vision",
+      "can_extend": true,
+      "can_amplify": false
+    },
+    "poison": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:poison\"",
+      "nbt_long": "Potion:\"minecraft:long_poison\"",
+      "nbt_strong": "Potion:\"minecraft:strong_poison\"",
+      "name": "Potion de poison",
+      "ingredient": "minecraft:spider_eye",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": true
+    },
+    "harming": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:harming\"",
+      "nbt_strong": "Potion:\"minecraft:strong_harming\"",
+      "name": "Potion de degats",
+      "ingredient": "minecraft:fermented_spider_eye",
+      "base": "healing",
+      "alternate_base": "poison",
+      "can_extend": false,
+      "can_amplify": true
+    },
+    "slowness": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:slowness\"",
+      "nbt_long": "Potion:\"minecraft:long_slowness\"",
+      "nbt_strong": "Potion:\"minecraft:strong_slowness\"",
+      "name": "Potion de lenteur",
+      "ingredient": "minecraft:fermented_spider_eye",
+      "base": "swiftness",
+      "alternate_base": "leaping",
+      "can_extend": true,
+      "can_amplify": true
+    },
+    "weakness": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:weakness\"",
+      "nbt_long": "Potion:\"minecraft:long_weakness\"",
+      "name": "Potion de faiblesse",
+      "ingredient": "minecraft:fermented_spider_eye",
+      "base": "water_bottle",
+      "can_extend": true,
+      "can_amplify": false
+    },
+    "slow_falling": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:slow_falling\"",
+      "nbt_long": "Potion:\"minecraft:long_slow_falling\"",
+      "name": "Potion de chute lente",
+      "ingredient": "minecraft:phantom_membrane",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": false
+    },
+    "turtle_master": {
+      "id": "minecraft:potion",
+      "nbt_normal": "Potion:\"minecraft:turtle_master\"",
+      "nbt_long": "Potion:\"minecraft:long_turtle_master\"",
+      "nbt_strong": "Potion:\"minecraft:strong_turtle_master\"",
+      "name": "Potion du Maitre Tortue",
+      "ingredient": "minecraft:turtle_helmet",
+      "base": "awkward",
+      "can_extend": true,
+      "can_amplify": true
+    }
+  },
+  "modifiers": {
+    "extend": {
+      "ingredient": "minecraft:redstone",
+      "name": "Prolongee"
+    },
+    "amplify": {
+      "ingredient": "minecraft:glowstone_dust",
+      "name": "Renforcee (II)"
+    },
+    "splash": {
+      "ingredient": "minecraft:gunpowder",
+      "name": "Splash"
+    },
+    "lingering": {
+      "ingredient": "minecraft:dragon_breath",
+      "name": "Persistante"
+    }
+  },
+  "items": {
+    "water_bottle": {
+      "id": "minecraft:potion",
+      "nbt": "Potion:\"minecraft:water\"",
+      "name": "Fiole d'eau"
+    },
+    "glass_bottle": {
+      "id": "minecraft:glass_bottle",
+      "name": "Fiole vide"
+    }
+  }
+}
