@@ -1,7 +1,7 @@
 -- ============================================
--- MOB TOWER MANAGER v1.4
+-- MOB TOWER MANAGER v1.4.1
 -- Version 1.21 NeoForge - TOUT EN UN
--- Boutons reactifs, vue stock, tri manuel
+-- Boutons ULTRA reactifs avec parallel
 -- ============================================
 
 -- ============================================
@@ -1116,7 +1116,7 @@ end
 -- ============================================
 
 local config = {
-    version = "1.4",
+    version = "1.4.1",
     player = { name = "MikeChausette", detectionRange = 16 },
     peripherals = { playerDetector = nil, monitor = nil },
     redstone = { side = "back", inverted = false },
@@ -1312,7 +1312,6 @@ end
 
 local running = true
 local spawnOn = true
-local lastSaveTime = 0
 
 local function loadConfig()
     if fs.exists(CONFIG_FILE) then
@@ -1421,81 +1420,71 @@ local function handleMonitorTouch(x, y)
     end
 end
 
-local function autoSave()
-    local now = os.epoch("utc") / 1000
-    if now - lastSaveTime < 60 then return end
-    lastSaveTime = now
-    storage.saveStats()
-end
-
 local function mainLoop()
-    local lastDisplayUpdate = 0
-    local lastSortCheck = 0
-    local displayInterval = 1  -- Mise à jour affichage toutes les 1s
-    local sortInterval = config.sorting.interval
-    
-    -- Premier affichage et timer
-    updateDisplay()
-    os.startTimer(config.display.refreshRate)
-    
-    while running do
-        -- Attendre un événement
-        local event, p1, p2, p3 = os.pullEvent()
-        
-        if event == "monitor_touch" then
-            -- Traitement IMMEDIAT du clic
-            handleMonitorTouch(p2, p3)
-            -- Relancer timer immédiatement
-            os.startTimer(config.display.refreshRate)
-        elseif event == "key" then
-            if p1 == keys.q then
-                running = false
-            elseif p1 == keys.s then
-                if config.redstone.side then
-                    local _, newState = peripherals.toggleSpawn(spawnOn)
-                    spawnOn = newState
-                    updateDisplay()
-                end
-            elseif p1 == keys.r then
-                storage.resetSession()
-                ui.showAlert("Stats reset!", 2)
-                updateDisplay()
-            elseif p1 == keys.c then
-                config.setupComplete = false
-                utils.saveTable(CONFIG_FILE, config)
-                os.reboot()
-            end
-            os.startTimer(config.display.refreshRate)
-        elseif event == "timer" then
-            local now = os.epoch("utc") / 1000
+    -- Boucle dédiée aux événements utilisateur (PRIORITAIRE)
+    local function inputHandler()
+        while running do
+            local event, p1, p2, p3 = os.pullEvent()
             
-            -- Tri automatique (seulement sur écran principal)
-            if config.sorting.enabled and ui.getCurrentScreen() == "main" then
-                if now - lastSortCheck >= sortInterval then
-                    lastSortCheck = now
-                    local result = storage.sortAll()
-                    for _, rare in ipairs(result.rares) do
-                        ui.showAlert("RARE: " .. utils.getShortName(rare.name), config.display.alertDuration)
+            if event == "monitor_touch" then
+                handleMonitorTouch(p2, p3)
+            elseif event == "key" then
+                if p1 == keys.q then
+                    running = false
+                elseif p1 == keys.s then
+                    if config.redstone.side then
+                        local _, newState = peripherals.toggleSpawn(spawnOn)
+                        spawnOn = newState
+                        updateDisplay()
                     end
+                elseif p1 == keys.r then
+                    storage.resetSession()
+                    ui.showAlert("Stats reset!", 2)
+                    updateDisplay()
+                elseif p1 == keys.c then
+                    config.setupComplete = false
+                    utils.saveTable(CONFIG_FILE, config)
+                    os.reboot()
                 end
             end
-            
-            -- Mise à jour affichage périodique
-            if now - lastDisplayUpdate >= displayInterval then
-                lastDisplayUpdate = now
-                updateDisplay()
-            end
-            
-            -- Mise à jour alerte
-            ui.updateAlert()
-            
-            -- Sauvegarde auto
-            autoSave()
-            
-            -- Relancer le timer
-            os.startTimer(config.display.refreshRate)
         end
     end
+    
+    -- Boucle dédiée au rafraîchissement de l'affichage
+    local function displayHandler()
+        while running do
+            updateDisplay()
+            ui.updateAlert()
+            sleep(2)  -- Rafraîchir toutes les 2 secondes
+        end
+    end
+    
+    -- Boucle dédiée au tri automatique
+    local function sortHandler()
+        while running do
+            if config.sorting.enabled and ui.getCurrentScreen() == "main" then
+                local result = storage.sortAll()
+                for _, rare in ipairs(result.rares) do
+                    ui.showAlert("RARE: " .. utils.getShortName(rare.name), config.display.alertDuration)
+                end
+            end
+            sleep(config.sorting.interval)
+        end
+    end
+    
+    -- Boucle dédiée à la sauvegarde
+    local function saveHandler()
+        while running do
+            storage.saveStats()
+            sleep(60)
+        end
+    end
+    
+    -- Premier affichage
+    updateDisplay()
+    
+    -- Lancer toutes les boucles en parallèle
+    parallel.waitForAny(inputHandler, displayHandler, sortHandler, saveHandler)
 end
 
 -- ============================================
