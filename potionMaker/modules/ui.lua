@@ -1,7 +1,7 @@
 -- ============================================
 -- Potion Maker - Module UI
 -- Interface moniteur 3x2
--- Version corrigée - sans clignotement
+-- Version corrigée - liste complète
 -- ============================================
 
 local UI = {}
@@ -26,6 +26,27 @@ local scrollOffset = 0
 local potionList = {}
 local lowStockAlerts = {}
 local lastScreen = nil
+
+-- Liste de tous les ingrédients possibles
+local allIngredients = {
+    { id = "minecraft:nether_wart", name = "Nether Wart" },
+    { id = "minecraft:blaze_powder", name = "Blaze Powder" },
+    { id = "minecraft:redstone", name = "Redstone" },
+    { id = "minecraft:glowstone_dust", name = "Glowstone Dust" },
+    { id = "minecraft:gunpowder", name = "Gunpowder" },
+    { id = "minecraft:dragon_breath", name = "Dragon Breath" },
+    { id = "minecraft:glistering_melon_slice", name = "Glistering Melon" },
+    { id = "minecraft:ghast_tear", name = "Ghast Tear" },
+    { id = "minecraft:sugar", name = "Sugar" },
+    { id = "minecraft:rabbit_foot", name = "Rabbit Foot" },
+    { id = "minecraft:magma_cream", name = "Magma Cream" },
+    { id = "minecraft:pufferfish", name = "Pufferfish" },
+    { id = "minecraft:golden_carrot", name = "Golden Carrot" },
+    { id = "minecraft:spider_eye", name = "Spider Eye" },
+    { id = "minecraft:fermented_spider_eye", name = "Fermented Spider Eye" },
+    { id = "minecraft:phantom_membrane", name = "Phantom Membrane" },
+    { id = "minecraft:turtle_helmet", name = "Turtle Shell" }
+}
 
 -- Couleurs du thème
 local theme = {
@@ -111,7 +132,7 @@ local function clearLine(y)
     write(string.rep(" ", width))
 end
 
--- Dessiner l'en-tête (SANS HEURE)
+-- Dessiner l'en-tête
 local function drawHeader()
     fillLine(1, theme.header)
     setCursor(2, 1)
@@ -225,18 +246,38 @@ local function drawDashboard()
     end
 end
 
--- Écran de commande
+-- Écran de commande (CORRIGÉ - plus de potions visibles)
 local function drawOrderScreen()
-    -- Liste des potions
+    local halfWidth = math.floor(width / 2)
+    
+    -- Titre liste potions
     setCursor(2, 4)
     setColors(theme.bg, theme.header)
-    write("POTION")
+    write("POTIONS (" .. #potionList .. ")")
     
-    local listHeight = math.min(8, height - 12)
+    -- Boutons scroll
+    setCursor(halfWidth - 6, 4)
+    setColors(theme.button, theme.text)
+    write(" ^ ")
+    table.insert(buttons, {
+        x1 = halfWidth - 6, y1 = 4, x2 = halfWidth - 4, y2 = 4,
+        action = "scrollUp"
+    })
+    
+    setCursor(halfWidth - 3, 4)
+    write(" v ")
+    table.insert(buttons, {
+        x1 = halfWidth - 3, y1 = 4, x2 = halfWidth - 1, y2 = 4,
+        action = "scrollDown"
+    })
+    
+    -- Liste des potions (hauteur maximale)
+    local listStartY = 5
+    local listHeight = height - 7  -- Plus de place pour la liste
     
     for i = 1, listHeight do
         local idx = i + scrollOffset
-        local y = 4 + i
+        local y = listStartY + i - 1
         clearLine(y)
         
         if idx <= #potionList then
@@ -246,16 +287,24 @@ local function drawOrderScreen()
             setCursor(1, y)
             if selected then
                 setColors(theme.buttonActive, theme.text)
-                write(string.rep(" ", math.floor(width / 2)))
-                setCursor(1, y)
             else
                 setColors(theme.bg, theme.text)
             end
             
-            write(" " .. potion.name:sub(1, math.floor(width / 2) - 2))
+            -- Numéro + nom
+            local displayText = string.format("%2d.%s", idx, potion.name:sub(1, halfWidth - 5))
+            write(displayText)
+            
+            -- Remplir jusqu'à mi-écran si sélectionné
+            if selected then
+                local remaining = halfWidth - #displayText
+                if remaining > 0 then
+                    write(string.rep(" ", remaining))
+                end
+            end
             
             table.insert(buttons, {
-                x1 = 1, y1 = y, x2 = math.floor(width / 2), y2 = y,
+                x1 = 1, y1 = y, x2 = halfWidth, y2 = y,
                 action = "selectPotion",
                 potion = potion.key
             })
@@ -263,7 +312,7 @@ local function drawOrderScreen()
     end
     
     -- Options à droite
-    local optX = math.floor(width / 2) + 2
+    local optX = halfWidth + 2
     
     -- Variant
     local varY = 4
@@ -280,7 +329,6 @@ local function drawOrderScreen()
     for i, v in ipairs(variants) do
         local y = varY + i
         local active = selectedVariant == v.key
-        clearLine(y)
         setCursor(optX, y)
         setColors(active and theme.buttonActive or theme.button, theme.text)
         write(" " .. v.label .. " ")
@@ -306,7 +354,6 @@ local function drawOrderScreen()
     for i, f in ipairs(forms) do
         local y = formY + i
         local active = selectedForm == f.key
-        clearLine(y)
         setCursor(optX, y)
         setColors(active and theme.buttonActive or theme.button, theme.text)
         write(" " .. f.label .. " ")
@@ -319,7 +366,6 @@ local function drawOrderScreen()
     
     -- Quantité
     local qtyY = formY + 5
-    clearLine(qtyY)
     setCursor(optX, qtyY)
     setColors(theme.bg, theme.text)
     write("Qte: ")
@@ -343,7 +389,6 @@ local function drawOrderScreen()
     
     -- Bouton Commander
     local cmdY = height - 2
-    clearLine(cmdY)
     if selectedPotion then
         setCursor(optX, cmdY)
         setColors(theme.success, theme.bg)
@@ -353,9 +398,14 @@ local function drawOrderScreen()
             action = "placeOrder"
         })
     end
+    
+    -- Info scroll en bas à gauche
+    setCursor(2, height - 1)
+    setColors(theme.bg, theme.textDim)
+    write("Scroll: " .. (scrollOffset + 1) .. "-" .. math.min(scrollOffset + listHeight, #potionList) .. "/" .. #potionList)
 end
 
--- Écran des potions en stock (CORRIGÉ)
+-- Écran des potions en stock
 local function drawPotionsScreen()
     setCursor(2, 4)
     setColors(theme.bg, theme.header)
@@ -372,16 +422,13 @@ local function drawPotionsScreen()
             setCursor(2, y)
             setColors(theme.bg, theme.text)
             
-            -- Afficher le nom
             write(displayName:sub(1, width - 15))
             
-            -- Afficher la quantité
             setCursor(width - 10, y)
             local lowStock = info.count < (config.alerts.low_stock_threshold or 5)
             setColors(theme.bg, lowStock and theme.warning or theme.success)
             write("x" .. info.count)
             
-            -- Bouton distribuer
             setCursor(width - 4, y)
             setColors(theme.button, theme.text)
             write(" > ")
@@ -403,79 +450,69 @@ local function drawPotionsScreen()
         write("Aucune potion en stock")
     end
     
-    -- Instructions en bas
     clearLine(height - 1)
     setCursor(2, height - 1)
     setColors(theme.bg, theme.textDim)
     write("Appuyez > pour distribuer")
 end
 
--- Écran du stock d'ingrédients
+-- Écran du stock d'ingrédients (CORRIGÉ - affiche tous les ingrédients)
 local function drawStockScreen()
     setCursor(2, 4)
     setColors(theme.bg, theme.header)
-    write("STOCK")
+    write("STOCK INGREDIENTS")
     
     local threshold = config.alerts.low_stock_threshold or 5
     local y = 5
     
-    -- Fioles d'eau
+    -- Fioles d'eau en premier
     clearLine(y)
     setCursor(2, y)
     setColors(theme.bg, theme.text)
     write("Fioles d'eau")
     local waterCount = Inventory.countWaterBottles()
     setCursor(width - 8, y)
-    setColors(theme.bg, waterCount < threshold and theme.error or theme.success)
-    write("x" .. waterCount)
+    if waterCount == 0 then
+        setColors(theme.bg, theme.error)
+    elseif waterCount < threshold then
+        setColors(theme.bg, theme.warning)
+    else
+        setColors(theme.bg, theme.success)
+    end
+    write(string.format("%4d", waterCount))
     y = y + 1
     
-    -- Ingrédients
+    -- Ligne de séparation
+    clearLine(y)
+    setCursor(2, y)
+    setColors(theme.bg, theme.textDim)
+    write(string.rep("-", width - 4))
+    y = y + 1
+    
+    -- Obtenir le stock actuel
     local stock = Inventory.getIngredientsStock()
     
-    -- Ingrédients importants en premier
-    local important = {
-        "minecraft:nether_wart",
-        "minecraft:blaze_powder",
-        "minecraft:redstone",
-        "minecraft:glowstone_dust",
-        "minecraft:gunpowder",
-        "minecraft:dragon_breath"
-    }
-    
-    for _, itemId in ipairs(important) do
+    -- Afficher TOUS les ingrédients (même si 0)
+    for _, ingredient in ipairs(allIngredients) do
         if y < height - 1 then
-            local count = stock[itemId] or 0
-            if count > 0 or itemId == "minecraft:nether_wart" or itemId == "minecraft:blaze_powder" then
-                clearLine(y)
-                setCursor(2, y)
-                setColors(theme.bg, theme.text)
-                
-                local name = itemId:gsub("minecraft:", ""):gsub("_", " ")
-                write(name:sub(1, width - 10))
-                
-                setCursor(width - 8, y)
-                setColors(theme.bg, count < threshold and theme.warning or theme.textDim)
-                write("x" .. count)
-                
-                y = y + 1
-            end
-            stock[itemId] = nil -- Retirer de la liste
-        end
-    end
-    
-    -- Autres ingrédients
-    for itemId, count in pairs(stock) do
-        if y < height - 1 then
+            local count = stock[ingredient.id] or 0
+            
             clearLine(y)
             setCursor(2, y)
-            setColors(theme.bg, theme.textDim)
             
-            local name = itemId:gsub("minecraft:", ""):gsub("_", " ")
-            write(name:sub(1, width - 10))
+            -- Couleur selon le stock
+            if count == 0 then
+                setColors(theme.bg, theme.error)
+            elseif count < threshold then
+                setColors(theme.bg, theme.warning)
+            else
+                setColors(theme.bg, theme.text)
+            end
+            
+            write(ingredient.name:sub(1, width - 10))
             
             setCursor(width - 8, y)
-            write("x" .. count)
+            write(string.format("%4d", count))
             
             y = y + 1
         end
@@ -487,23 +524,20 @@ function UI.checkLowStock()
     lowStockAlerts = {}
     local threshold = config.alerts.low_stock_threshold or 5
     
-    -- Vérifier les fioles d'eau
     local waterCount = Inventory.countWaterBottles()
     if waterCount < threshold then
         table.insert(lowStockAlerts, { name = "Fioles d'eau", count = waterCount })
     end
     
-    -- Vérifier les ingrédients importants
     local stock = Inventory.getIngredientsStock()
-    local importantIngredients = {
+    
+    -- Vérifier les ingrédients critiques
+    local critical = {
         { id = "minecraft:nether_wart", name = "Nether Wart" },
-        { id = "minecraft:blaze_powder", name = "Blaze Powder" },
-        { id = "minecraft:redstone", name = "Redstone" },
-        { id = "minecraft:glowstone_dust", name = "Glowstone" },
-        { id = "minecraft:gunpowder", name = "Gunpowder" }
+        { id = "minecraft:blaze_powder", name = "Blaze Powder" }
     }
     
-    for _, item in ipairs(importantIngredients) do
+    for _, item in ipairs(critical) do
         local count = stock[item.id] or 0
         if count < threshold then
             table.insert(lowStockAlerts, { name = item.name, count = count })
@@ -517,7 +551,6 @@ end
 function UI.draw()
     if not monitor then return end
     
-    -- Ne clear que si on change d'écran
     if currentScreen ~= lastScreen then
         clear()
         lastScreen = currentScreen
@@ -549,7 +582,7 @@ function UI.handleClick(x, y)
     return nil
 end
 
--- Gérer les actions (CORRIGÉ)
+-- Gérer les actions
 function UI.handleAction(btn)
     local action = btn.action
     
@@ -590,12 +623,20 @@ function UI.handleAction(btn)
         end
         
     elseif action == "distribute" then
-        -- CORRECTION: retourner le displayName directement
         return {
             type = "distribute",
             displayName = btn.displayName,
             count = btn.count or 1
         }
+        
+    elseif action == "scrollUp" then
+        scrollOffset = math.max(0, scrollOffset - 1)
+        return { type = "scroll", direction = "up" }
+        
+    elseif action == "scrollDown" then
+        local maxScroll = math.max(0, #potionList - (height - 7))
+        scrollOffset = math.min(maxScroll, scrollOffset + 1)
+        return { type = "scroll", direction = "down" }
     end
     
     return nil
@@ -604,10 +645,12 @@ end
 -- Scroll
 function UI.scroll(direction)
     if currentScreen == "order" then
+        local listHeight = height - 7
         if direction == "up" then
             scrollOffset = math.max(0, scrollOffset - 1)
         else
-            scrollOffset = math.min(math.max(0, #potionList - 5), scrollOffset + 1)
+            local maxScroll = math.max(0, #potionList - listHeight)
+            scrollOffset = math.min(maxScroll, scrollOffset + 1)
         end
     end
 end
