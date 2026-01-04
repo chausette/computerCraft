@@ -29,8 +29,8 @@ Un programme ComputerCraft pour gérer et automatiser votre tour à mobs.
 
 ## 🆕 Nouveautés v1.4
 
-- ✅ **Boutons plus réactifs** (refresh 0.5s au lieu de 1s)
-- ✅ **Vue STOCK** : voir le remplissage de chaque baril avec pagination
+- ✅ **Boutons plus réactifs** (réponse immédiate au clic)
+- ✅ **Vue STOCK** : voir le remplissage de chaque baril (15 par page)
 - ✅ **Bouton TRI** : forcer le tri/réorganisation de tous les barils
 - ✅ 5 boutons en bas : STOCK, TRI, CONFIG, RESET, QUIT
 - ✅ Barre de progression pendant le tri manuel
@@ -73,7 +73,7 @@ wget run https://raw.githubusercontent.com/chausette/computerCraft/master/mobTow
 
 ### 📦 Vue STOCK
 
-Affiche le remplissage de chaque baril avec :
+Affiche le remplissage de chaque baril (15 par page) avec :
 - Nom de l'item
 - Barre de progression colorée (vert → orange → rouge)
 - Pourcentage et slots utilisés
@@ -136,8 +136,8 @@ Navigation :
 ## 📜 Changelog
 
 ### v1.4
-- ✅ Boutons plus réactifs
-- ✅ Vue STOCK avec pagination
+- ✅ Boutons réactifs (réponse immédiate)
+- ✅ Vue STOCK avec 15 coffres par page
 - ✅ Bouton TRI manuel
 - ✅ Barre de progression du tri
 

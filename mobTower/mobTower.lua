@@ -698,7 +698,7 @@ local alertState = { active = false, message = "", startTime = 0, duration = 3 }
 local buttons = {}
 local currentScreen = "main"  -- main, stock
 local stockPage = 1
-local stockItemsPerPage = 8
+local stockItemsPerPage = 15  -- 15 coffres par page
 
 local theme = {
     bg = colors.black, header = colors.blue, headerText = colors.white,
@@ -1121,8 +1121,8 @@ local config = {
     peripherals = { playerDetector = nil, monitor = nil },
     redstone = { side = "back", inverted = false },
     storage = { collectorChest = nil, overflowChest = nil, sortingRules = {} },
-    display = { refreshRate = 0.5, graphHours = 12, rareItemsCount = 5, alertDuration = 5 },
-    sorting = { interval = 5, enabled = true },
+    display = { refreshRate = 0.1, graphHours = 12, rareItemsCount = 5, alertDuration = 5 },
+    sorting = { interval = 3, enabled = true },
     setupComplete = false
 }
 
@@ -1312,7 +1312,6 @@ end
 
 local running = true
 local spawnOn = true
-local lastSortTime = 0
 local lastSaveTime = 0
 
 local function loadConfig()
@@ -1378,6 +1377,7 @@ local function handleMonitorTouch(x, y)
         if config.redstone.side then
             local _, newState = peripherals.toggleSpawn(spawnOn)
             spawnOn = newState
+            updateDisplay()  -- Feedback immédiat
         end
     elseif buttonId == "stock" then
         stockPage = 1
@@ -1403,10 +1403,10 @@ local function handleMonitorTouch(x, y)
         
         local moved = storage.deepSort(function(current, total, itemName)
             ui.drawSortProgress(current, total, itemName)
-            sleep(0.1)
+            sleep(0.05)  -- Plus rapide
         end)
         
-        ui.showAlert("Tri termine! " .. moved .. " items", 3)
+        ui.showAlert("Tri: " .. moved .. " items", 3)
         updateDisplay()
     elseif buttonId == "config" then
         config.setupComplete = false
@@ -1421,20 +1421,6 @@ local function handleMonitorTouch(x, y)
     end
 end
 
-local function sortItems()
-    if not config.sorting.enabled then return end
-    if ui.getCurrentScreen() ~= "main" then return end
-    
-    local now = os.epoch("utc") / 1000
-    if now - lastSortTime < config.sorting.interval then return end
-    lastSortTime = now
-    
-    local result = storage.sortAll()
-    for _, rare in ipairs(result.rares) do
-        ui.showAlert("RARE: " .. utils.getShortName(rare.name), config.display.alertDuration)
-    end
-end
-
 local function autoSave()
     local now = os.epoch("utc") / 1000
     if now - lastSaveTime < 60 then return end
@@ -1443,43 +1429,71 @@ local function autoSave()
 end
 
 local function mainLoop()
+    local lastDisplayUpdate = 0
+    local lastSortCheck = 0
+    local displayInterval = 1  -- Mise à jour affichage toutes les 1s
+    local sortInterval = config.sorting.interval
+    
+    -- Premier affichage et timer
+    updateDisplay()
+    os.startTimer(config.display.refreshRate)
+    
     while running do
-        sortItems()
-        updateDisplay()
-        ui.updateAlert()
-        autoSave()
+        -- Attendre un événement
+        local event, p1, p2, p3 = os.pullEvent()
         
-        -- Timer court pour réactivité
-        local timer = os.startTimer(config.display.refreshRate)
-        
-        while true do
-            local event, p1, p2, p3 = os.pullEvent()
-            
-            if event == "timer" and p1 == timer then
-                break
-            elseif event == "monitor_touch" then
-                os.cancelTimer(timer)
-                handleMonitorTouch(p2, p3)
-                break
-            elseif event == "key" then
-                os.cancelTimer(timer)
-                if p1 == keys.q then
-                    running = false
-                elseif p1 == keys.s then
-                    if config.redstone.side then
-                        local _, newState = peripherals.toggleSpawn(spawnOn)
-                        spawnOn = newState
-                    end
-                elseif p1 == keys.r then
-                    storage.resetSession()
-                    ui.showAlert("Stats reset!", 2)
-                elseif p1 == keys.c then
-                    config.setupComplete = false
-                    utils.saveTable(CONFIG_FILE, config)
-                    os.reboot()
+        if event == "monitor_touch" then
+            -- Traitement IMMEDIAT du clic
+            handleMonitorTouch(p2, p3)
+            -- Relancer timer immédiatement
+            os.startTimer(config.display.refreshRate)
+        elseif event == "key" then
+            if p1 == keys.q then
+                running = false
+            elseif p1 == keys.s then
+                if config.redstone.side then
+                    local _, newState = peripherals.toggleSpawn(spawnOn)
+                    spawnOn = newState
+                    updateDisplay()
                 end
-                break
+            elseif p1 == keys.r then
+                storage.resetSession()
+                ui.showAlert("Stats reset!", 2)
+                updateDisplay()
+            elseif p1 == keys.c then
+                config.setupComplete = false
+                utils.saveTable(CONFIG_FILE, config)
+                os.reboot()
             end
+            os.startTimer(config.display.refreshRate)
+        elseif event == "timer" then
+            local now = os.epoch("utc") / 1000
+            
+            -- Tri automatique (seulement sur écran principal)
+            if config.sorting.enabled and ui.getCurrentScreen() == "main" then
+                if now - lastSortCheck >= sortInterval then
+                    lastSortCheck = now
+                    local result = storage.sortAll()
+                    for _, rare in ipairs(result.rares) do
+                        ui.showAlert("RARE: " .. utils.getShortName(rare.name), config.display.alertDuration)
+                    end
+                end
+            end
+            
+            -- Mise à jour affichage périodique
+            if now - lastDisplayUpdate >= displayInterval then
+                lastDisplayUpdate = now
+                updateDisplay()
+            end
+            
+            -- Mise à jour alerte
+            ui.updateAlert()
+            
+            -- Sauvegarde auto
+            autoSave()
+            
+            -- Relancer le timer
+            os.startTimer(config.display.refreshRate)
         end
     end
 end
