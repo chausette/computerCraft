@@ -1,6 +1,7 @@
 -- ============================================
 -- Potion Maker - Module UI
 -- Interface moniteur 3x2
+-- Version corrigée - sans clignotement
 -- ============================================
 
 local UI = {}
@@ -16,7 +17,7 @@ local config = nil
 local recipes = nil
 
 -- État de l'UI
-local currentScreen = "dashboard"  -- dashboard, order, potions, settings
+local currentScreen = "dashboard"
 local selectedPotion = nil
 local selectedVariant = "normal"
 local selectedForm = "normal"
@@ -24,6 +25,7 @@ local selectedQuantity = 3
 local scrollOffset = 0
 local potionList = {}
 local lowStockAlerts = {}
+local lastScreen = nil
 
 -- Couleurs du thème
 local theme = {
@@ -41,6 +43,9 @@ local theme = {
 
 -- Dimensions du moniteur
 local width, height = 0, 0
+
+-- Boutons pour les clics
+local buttons = {}
 
 -- Initialiser l'UI
 function UI.init(cfg, mon, rec)
@@ -99,44 +104,34 @@ local function fillLine(y, bg)
     write(string.rep(" ", width))
 end
 
-local function drawButton(x, y, text, active)
+local function clearLine(y)
     if not monitor then return end
-    local bg = active and theme.buttonActive or theme.button
-    setColors(bg, theme.text)
-    setCursor(x, y)
-    write(" " .. text .. " ")
-    return { x1 = x, y1 = y, x2 = x + #text + 1, y2 = y, action = text }
+    setCursor(1, y)
+    setColors(theme.bg, theme.text)
+    write(string.rep(" ", width))
 end
 
--- Dessiner l'en-tête
+-- Dessiner l'en-tête (SANS HEURE)
 local function drawHeader()
     fillLine(1, theme.header)
     setCursor(2, 1)
     setColors(theme.header, theme.bg)
     write("POTION MAKER")
-    
-    -- Heure
-    local time = textutils.formatTime(os.time(), true)
-    setCursor(width - #time, 1)
-    write(time)
 end
 
 -- Dessiner la barre de navigation
-local buttons = {}
-
 local function drawNav()
-    buttons = {}
     local y = 2
     fillLine(y, colors.gray)
     
     local navItems = {
-        { text = "Dashboard", screen = "dashboard" },
-        { text = "Commander", screen = "order" },
+        { text = "Accueil", screen = "dashboard" },
+        { text = "Cmd", screen = "order" },
         { text = "Potions", screen = "potions" },
         { text = "Stock", screen = "stock" }
     }
     
-    local x = 2
+    local x = 1
     for _, item in ipairs(navItems) do
         local active = currentScreen == item.screen
         local bg = active and theme.buttonActive or colors.gray
@@ -149,7 +144,7 @@ local function drawNav()
             action = "nav",
             screen = item.screen
         })
-        x = x + #item.text + 3
+        x = x + #item.text + 2
     end
 end
 
@@ -163,9 +158,10 @@ local function drawDashboard()
     local stands = Brewing.getStatus()
     for i, stand in ipairs(stands) do
         local y = 5 + (i - 1)
+        clearLine(y)
         setCursor(2, y)
         setColors(theme.bg, theme.text)
-        write("Alambic " .. i .. ": ")
+        write("#" .. i .. ": ")
         
         if stand.status == "idle" then
             setColors(theme.bg, theme.success)
@@ -186,42 +182,45 @@ local function drawDashboard()
     write("FILE D'ATTENTE")
     
     local counts = Queue.count()
+    clearLine(queueY + 1)
     setCursor(2, queueY + 1)
     setColors(theme.bg, theme.text)
-    write("En attente: ")
+    write("Attente: ")
     setColors(theme.bg, counts.pending > 0 and theme.warning or theme.success)
     write(tostring(counts.pending))
     
-    setCursor(2, queueY + 2)
     setColors(theme.bg, theme.text)
-    write("En cours: ")
+    write("  En cours: ")
     setColors(theme.bg, counts.processing > 0 and theme.highlight or theme.textDim)
     write(tostring(counts.processing))
     
     -- Commandes en attente (liste)
     local pending = Queue.getPending()
-    local listY = queueY + 4
+    local listY = queueY + 3
     
-    for i = 1, math.min(3, #pending) do
+    for i = 1, math.min(4, #pending) do
         local cmd = pending[i]
+        clearLine(listY + i - 1)
         setCursor(2, listY + i - 1)
         setColors(theme.bg, theme.textDim)
         local name = Recipes.getFullPotionName(recipes, cmd.potion, cmd.variant, cmd.form)
-        write(i .. ". " .. name:sub(1, 20) .. " x" .. cmd.quantity)
+        write(i .. ". " .. name:sub(1, 22) .. " x" .. cmd.quantity)
     end
     
-    -- Section Alertes
+    -- Section Alertes stock bas
     if #lowStockAlerts > 0 then
-        local alertY = height - 3
+        local alertY = height - 4
+        clearLine(alertY)
         setCursor(2, alertY)
         setColors(theme.bg, theme.error)
         write("! STOCK BAS !")
         
         for i, alert in ipairs(lowStockAlerts) do
             if i > 2 then break end
+            clearLine(alertY + i)
             setCursor(2, alertY + i)
             setColors(theme.bg, theme.warning)
-            write(alert.name:sub(1, 25) .. ": " .. alert.count)
+            write(alert.name:sub(1, 20) .. ": " .. alert.count)
         end
     end
 end
@@ -231,28 +230,32 @@ local function drawOrderScreen()
     -- Liste des potions
     setCursor(2, 4)
     setColors(theme.bg, theme.header)
-    write("CHOISIR POTION")
+    write("POTION")
     
-    local listHeight = height - 10
-    local visiblePotions = math.min(listHeight, #potionList)
+    local listHeight = math.min(8, height - 12)
     
-    for i = 1, visiblePotions do
+    for i = 1, listHeight do
         local idx = i + scrollOffset
+        local y = 4 + i
+        clearLine(y)
+        
         if idx <= #potionList then
             local potion = potionList[idx]
-            local y = 4 + i
             local selected = selectedPotion == potion.key
             
+            setCursor(1, y)
             if selected then
-                fillLine(y, theme.buttonActive)
+                setColors(theme.buttonActive, theme.text)
+                write(string.rep(" ", math.floor(width / 2)))
+                setCursor(1, y)
+            else
+                setColors(theme.bg, theme.text)
             end
             
-            setCursor(2, y)
-            setColors(selected and theme.buttonActive or theme.bg, theme.text)
-            write(potion.name)
+            write(" " .. potion.name:sub(1, math.floor(width / 2) - 2))
             
             table.insert(buttons, {
-                x1 = 1, y1 = y, x2 = width / 2, y2 = y,
+                x1 = 1, y1 = y, x2 = math.floor(width / 2), y2 = y,
                 action = "selectPotion",
                 potion = potion.key
             })
@@ -263,73 +266,96 @@ local function drawOrderScreen()
     local optX = math.floor(width / 2) + 2
     
     -- Variant
-    setCursor(optX, 4)
+    local varY = 4
+    setCursor(optX, varY)
     setColors(theme.bg, theme.header)
     write("TYPE")
     
-    local variants = { "normal", "extended", "amplified" }
-    local variantNames = { "Normal", "Prolonge+", "Renforce II" }
+    local variants = {
+        { key = "normal", label = "Normal" },
+        { key = "extended", label = "Duree+" },
+        { key = "amplified", label = "Force II" }
+    }
     
-    for i, variant in ipairs(variants) do
-        local y = 4 + i
-        local active = selectedVariant == variant
+    for i, v in ipairs(variants) do
+        local y = varY + i
+        local active = selectedVariant == v.key
+        clearLine(y)
         setCursor(optX, y)
         setColors(active and theme.buttonActive or theme.button, theme.text)
-        write(" " .. variantNames[i] .. " ")
+        write(" " .. v.label .. " ")
         table.insert(buttons, {
-            x1 = optX, y1 = y, x2 = optX + 12, y2 = y,
+            x1 = optX, y1 = y, x2 = optX + #v.label + 2, y2 = y,
             action = "selectVariant",
-            variant = variant
+            variant = v.key
         })
     end
     
     -- Forme
-    setCursor(optX, 9)
+    local formY = varY + 5
+    setCursor(optX, formY)
     setColors(theme.bg, theme.header)
     write("FORME")
     
-    local forms = { "normal", "splash", "lingering" }
-    local formNames = { "Normal", "Splash", "Persistant" }
+    local forms = {
+        { key = "normal", label = "Normal" },
+        { key = "splash", label = "Splash" },
+        { key = "lingering", label = "Persist" }
+    }
     
-    for i, form in ipairs(forms) do
-        local y = 9 + i
-        local active = selectedForm == form
+    for i, f in ipairs(forms) do
+        local y = formY + i
+        local active = selectedForm == f.key
+        clearLine(y)
         setCursor(optX, y)
         setColors(active and theme.buttonActive or theme.button, theme.text)
-        write(" " .. formNames[i] .. " ")
+        write(" " .. f.label .. " ")
         table.insert(buttons, {
-            x1 = optX, y1 = y, x2 = optX + 12, y2 = y,
+            x1 = optX, y1 = y, x2 = optX + #f.label + 2, y2 = y,
             action = "selectForm",
-            form = form
+            form = f.key
         })
     end
     
     -- Quantité
-    setCursor(optX, 14)
-    setColors(theme.bg, theme.header)
-    write("QUANTITE: " .. selectedQuantity)
+    local qtyY = formY + 5
+    clearLine(qtyY)
+    setCursor(optX, qtyY)
+    setColors(theme.bg, theme.text)
+    write("Qte: ")
     
-    setCursor(optX, 15)
-    local btn = drawButton(optX, 15, "-", false)
-    btn.action = "quantityDown"
-    table.insert(buttons, btn)
+    setColors(theme.button, theme.text)
+    write(" - ")
+    table.insert(buttons, {
+        x1 = optX + 5, y1 = qtyY, x2 = optX + 7, y2 = qtyY,
+        action = "quantityDown"
+    })
     
-    btn = drawButton(optX + 4, 15, "+", false)
-    btn.action = "quantityUp"
-    table.insert(buttons, btn)
+    setColors(theme.bg, theme.highlight)
+    write(" " .. selectedQuantity .. " ")
+    
+    setColors(theme.button, theme.text)
+    write(" + ")
+    table.insert(buttons, {
+        x1 = optX + 12, y1 = qtyY, x2 = optX + 14, y2 = qtyY,
+        action = "quantityUp"
+    })
     
     -- Bouton Commander
     local cmdY = height - 2
-    setCursor(optX, cmdY)
-    setColors(theme.success, theme.bg)
-    write(" COMMANDER ")
-    table.insert(buttons, {
-        x1 = optX, y1 = cmdY, x2 = optX + 11, y2 = cmdY,
-        action = "placeOrder"
-    })
+    clearLine(cmdY)
+    if selectedPotion then
+        setCursor(optX, cmdY)
+        setColors(theme.success, theme.bg)
+        write(" COMMANDER ")
+        table.insert(buttons, {
+            x1 = optX, y1 = cmdY, x2 = optX + 11, y2 = cmdY,
+            action = "placeOrder"
+        })
+    end
 end
 
--- Écran des potions en stock
+-- Écran des potions en stock (CORRIGÉ)
 local function drawPotionsScreen()
     setCursor(2, 4)
     setColors(theme.bg, theme.header)
@@ -337,82 +363,118 @@ local function drawPotionsScreen()
     
     local stock = Inventory.getPotionsStock()
     local y = 5
+    local potionIndex = 0
     
-    for key, info in pairs(stock) do
+    for displayName, info in pairs(stock) do
+        potionIndex = potionIndex + 1
         if y < height - 2 then
+            clearLine(y)
             setCursor(2, y)
             setColors(theme.bg, theme.text)
             
-            local displayName = info.displayName or info.name
-            displayName = displayName:gsub("minecraft:", "")
+            -- Afficher le nom
+            write(displayName:sub(1, width - 15))
             
-            write(displayName:sub(1, 30))
-            
-            setCursor(width - 8, y)
-            setColors(theme.bg, info.count < config.alerts.low_stock_threshold and theme.warning or theme.success)
+            -- Afficher la quantité
+            setCursor(width - 10, y)
+            local lowStock = info.count < (config.alerts.low_stock_threshold or 5)
+            setColors(theme.bg, lowStock and theme.warning or theme.success)
             write("x" .. info.count)
             
             -- Bouton distribuer
-            local btnX = width - 4
+            setCursor(width - 4, y)
             setColors(theme.button, theme.text)
             write(" > ")
             table.insert(buttons, {
-                x1 = btnX, y1 = y, x2 = width, y2 = y,
+                x1 = width - 4, y1 = y, x2 = width, y2 = y,
                 action = "distribute",
-                item = info
+                displayName = displayName,
+                count = 1
             })
             
             y = y + 1
         end
     end
     
-    if y == 5 then
+    if potionIndex == 0 then
+        clearLine(6)
         setCursor(2, 6)
         setColors(theme.bg, theme.textDim)
         write("Aucune potion en stock")
     end
+    
+    -- Instructions en bas
+    clearLine(height - 1)
+    setCursor(2, height - 1)
+    setColors(theme.bg, theme.textDim)
+    write("Appuyez > pour distribuer")
 end
 
 -- Écran du stock d'ingrédients
 local function drawStockScreen()
     setCursor(2, 4)
     setColors(theme.bg, theme.header)
-    write("STOCK INGREDIENTS")
+    write("STOCK")
     
-    local stock = Inventory.getIngredientsStock()
+    local threshold = config.alerts.low_stock_threshold or 5
     local y = 5
     
     -- Fioles d'eau
+    clearLine(y)
     setCursor(2, y)
     setColors(theme.bg, theme.text)
     write("Fioles d'eau")
     local waterCount = Inventory.countWaterBottles()
     setCursor(width - 8, y)
-    setColors(theme.bg, waterCount < config.alerts.low_stock_threshold and theme.error or theme.success)
+    setColors(theme.bg, waterCount < threshold and theme.error or theme.success)
     write("x" .. waterCount)
     y = y + 1
     
-    -- Blaze powder (fuel)
-    setCursor(2, y)
-    setColors(theme.bg, theme.text)
-    write("Blaze Powder")
-    local blazeCount = stock["minecraft:blaze_powder"] or 0
-    setCursor(width - 8, y)
-    setColors(theme.bg, blazeCount < config.alerts.low_stock_threshold and theme.error or theme.success)
-    write("x" .. blazeCount)
-    y = y + 2
+    -- Ingrédients
+    local stock = Inventory.getIngredientsStock()
+    
+    -- Ingrédients importants en premier
+    local important = {
+        "minecraft:nether_wart",
+        "minecraft:blaze_powder",
+        "minecraft:redstone",
+        "minecraft:glowstone_dust",
+        "minecraft:gunpowder",
+        "minecraft:dragon_breath"
+    }
+    
+    for _, itemId in ipairs(important) do
+        if y < height - 1 then
+            local count = stock[itemId] or 0
+            if count > 0 or itemId == "minecraft:nether_wart" or itemId == "minecraft:blaze_powder" then
+                clearLine(y)
+                setCursor(2, y)
+                setColors(theme.bg, theme.text)
+                
+                local name = itemId:gsub("minecraft:", ""):gsub("_", " ")
+                write(name:sub(1, width - 10))
+                
+                setCursor(width - 8, y)
+                setColors(theme.bg, count < threshold and theme.warning or theme.textDim)
+                write("x" .. count)
+                
+                y = y + 1
+            end
+            stock[itemId] = nil -- Retirer de la liste
+        end
+    end
     
     -- Autres ingrédients
     for itemId, count in pairs(stock) do
-        if y < height - 1 and itemId ~= "minecraft:blaze_powder" then
+        if y < height - 1 then
+            clearLine(y)
             setCursor(2, y)
-            setColors(theme.bg, theme.text)
+            setColors(theme.bg, theme.textDim)
             
             local name = itemId:gsub("minecraft:", ""):gsub("_", " ")
-            write(name:sub(1, 25))
+            write(name:sub(1, width - 10))
             
             setCursor(width - 8, y)
-            setColors(theme.bg, count < config.alerts.low_stock_threshold and theme.warning or theme.textDim)
             write("x" .. count)
             
             y = y + 1
@@ -423,30 +485,28 @@ end
 -- Vérifier les stocks bas
 function UI.checkLowStock()
     lowStockAlerts = {}
+    local threshold = config.alerts.low_stock_threshold or 5
     
     -- Vérifier les fioles d'eau
     local waterCount = Inventory.countWaterBottles()
-    if waterCount < config.alerts.low_stock_threshold then
+    if waterCount < threshold then
         table.insert(lowStockAlerts, { name = "Fioles d'eau", count = waterCount })
     end
     
     -- Vérifier les ingrédients importants
     local stock = Inventory.getIngredientsStock()
     local importantIngredients = {
-        "minecraft:nether_wart",
-        "minecraft:blaze_powder",
-        "minecraft:redstone",
-        "minecraft:glowstone_dust",
-        "minecraft:gunpowder"
+        { id = "minecraft:nether_wart", name = "Nether Wart" },
+        { id = "minecraft:blaze_powder", name = "Blaze Powder" },
+        { id = "minecraft:redstone", name = "Redstone" },
+        { id = "minecraft:glowstone_dust", name = "Glowstone" },
+        { id = "minecraft:gunpowder", name = "Gunpowder" }
     }
     
     for _, item in ipairs(importantIngredients) do
-        local count = stock[item] or 0
-        if count < config.alerts.low_stock_threshold then
-            table.insert(lowStockAlerts, {
-                name = item:gsub("minecraft:", ""):gsub("_", " "),
-                count = count
-            })
+        local count = stock[item.id] or 0
+        if count < threshold then
+            table.insert(lowStockAlerts, { name = item.name, count = count })
         end
     end
     
@@ -457,7 +517,12 @@ end
 function UI.draw()
     if not monitor then return end
     
-    clear()
+    -- Ne clear que si on change d'écran
+    if currentScreen ~= lastScreen then
+        clear()
+        lastScreen = currentScreen
+    end
+    
     buttons = {}
     
     drawHeader()
@@ -484,34 +549,36 @@ function UI.handleClick(x, y)
     return nil
 end
 
--- Gérer les actions
+-- Gérer les actions (CORRIGÉ)
 function UI.handleAction(btn)
-    if btn.action == "nav" then
+    local action = btn.action
+    
+    if action == "nav" then
         currentScreen = btn.screen
         scrollOffset = 0
         return { type = "navigate", screen = btn.screen }
         
-    elseif btn.action == "selectPotion" then
+    elseif action == "selectPotion" then
         selectedPotion = btn.potion
         return { type = "selectPotion", potion = btn.potion }
         
-    elseif btn.action == "selectVariant" then
+    elseif action == "selectVariant" then
         selectedVariant = btn.variant
         return { type = "selectVariant", variant = btn.variant }
         
-    elseif btn.action == "selectForm" then
+    elseif action == "selectForm" then
         selectedForm = btn.form
         return { type = "selectForm", form = btn.form }
         
-    elseif btn.action == "quantityUp" then
+    elseif action == "quantityUp" then
         selectedQuantity = math.min(selectedQuantity + 3, 64)
         return { type = "quantityChange", quantity = selectedQuantity }
         
-    elseif btn.action == "quantityDown" then
+    elseif action == "quantityDown" then
         selectedQuantity = math.max(selectedQuantity - 3, 3)
         return { type = "quantityChange", quantity = selectedQuantity }
         
-    elseif btn.action == "placeOrder" then
+    elseif action == "placeOrder" then
         if selectedPotion then
             return {
                 type = "order",
@@ -522,10 +589,12 @@ function UI.handleAction(btn)
             }
         end
         
-    elseif btn.action == "distribute" then
+    elseif action == "distribute" then
+        -- CORRECTION: retourner le displayName directement
         return {
             type = "distribute",
-            item = btn.item
+            displayName = btn.displayName,
+            count = btn.count or 1
         }
     end
     
@@ -538,7 +607,7 @@ function UI.scroll(direction)
         if direction == "up" then
             scrollOffset = math.max(0, scrollOffset - 1)
         else
-            scrollOffset = math.min(#potionList - 5, scrollOffset + 1)
+            scrollOffset = math.min(math.max(0, #potionList - 5), scrollOffset + 1)
         end
     end
 end
@@ -552,6 +621,11 @@ end
 function UI.setScreen(screen)
     currentScreen = screen
     scrollOffset = 0
+end
+
+-- Forcer un refresh complet
+function UI.forceRefresh()
+    lastScreen = nil
 end
 
 -- Obtenir les alertes

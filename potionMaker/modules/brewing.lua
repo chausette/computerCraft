@@ -1,6 +1,7 @@
 -- ============================================
 -- Potion Maker - Module Brewing
 -- Contrôle des alambics
+-- Version corrigée
 -- ============================================
 
 local Brewing = {}
@@ -11,12 +12,9 @@ local Inventory = require("modules.inventory")
 local brewingStands = {}
 local config = nil
 
--- Slots de l'alambic (Minecraft)
--- 0: Ingrédient (haut)
--- 1: Blaze powder (fuel)
--- 2, 3, 4: Fioles (bas gauche, milieu, droite)
+-- Slots de l'alambic (ComputerCraft)
 local SLOTS = {
-    INGREDIENT = 1,  -- ComputerCraft commence à 1
+    INGREDIENT = 1,
     FUEL = 2,
     BOTTLE_1 = 3,
     BOTTLE_2 = 4,
@@ -34,7 +32,7 @@ function Brewing.init(cfg)
             brewingStands[i] = {
                 name = standName,
                 peripheral = stand,
-                status = "idle",  -- idle, brewing, waiting
+                status = "idle",
                 currentStep = nil,
                 progress = 0,
                 bottles = { false, false, false }
@@ -55,7 +53,6 @@ function Brewing.getStatus()
     local status = {}
     
     for i, stand in ipairs(brewingStands) do
-        -- Mettre à jour l'état depuis le périphérique
         Brewing.updateStandStatus(i)
         
         status[i] = {
@@ -80,13 +77,23 @@ function Brewing.updateStandStatus(standIndex)
     -- Lire le temps de brassage restant
     local brewTime = 0
     
-    -- Essayer différentes méthodes selon l'API disponible
-    if p.getBrewTime then
-        brewTime = p.getBrewTime() or 0
+    local ok, result = pcall(function()
+        if p.getBrewTime then
+            return p.getBrewTime() or 0
+        end
+        return 0
+    end)
+    
+    if ok then
+        brewTime = result
     end
     
     -- Vérifier le contenu des slots
-    local items = p.list()
+    local items = {}
+    pcall(function()
+        items = p.list() or {}
+    end)
+    
     stand.bottles = {
         items[SLOTS.BOTTLE_1] ~= nil,
         items[SLOTS.BOTTLE_2] ~= nil,
@@ -94,14 +101,13 @@ function Brewing.updateStandStatus(standIndex)
     }
     
     local hasIngredient = items[SLOTS.INGREDIENT] ~= nil
-    local hasFuel = items[SLOTS.FUEL] ~= nil
     
     -- Déterminer le statut
     if brewTime > 0 then
         stand.status = "brewing"
         stand.progress = math.floor((400 - brewTime) / 400 * 100)
     elseif hasIngredient and (stand.bottles[1] or stand.bottles[2] or stand.bottles[3]) then
-        stand.status = "waiting" -- En attente de fuel ou bug
+        stand.status = "waiting"
         stand.progress = 0
     else
         stand.status = "idle"
@@ -125,7 +131,9 @@ function Brewing.hasFuel(standIndex)
     local stand = brewingStands[standIndex]
     if not stand then return false, 0 end
     
-    local items = stand.peripheral.list()
+    local ok, items = pcall(function() return stand.peripheral.list() end)
+    if not ok or not items then return false, 0 end
+    
     if items[SLOTS.FUEL] then
         return true, items[SLOTS.FUEL].count
     end
@@ -138,40 +146,55 @@ function Brewing.addFuel(standIndex, count)
     local stand = brewingStands[standIndex]
     if not stand then return 0 end
     
-    -- Chercher du blaze powder dans les ingrédients
     local slot = Inventory.findItem("ingredients", "minecraft:blaze_powder")
     if not slot then return 0 end
     
     local chest = Inventory.getChest("ingredients")
-    return chest.pushItems(stand.name, slot, count or 64, SLOTS.FUEL)
+    if not chest then return 0 end
+    
+    local ok, result = pcall(function()
+        return chest.pushItems(stand.name, slot, count or 64, SLOTS.FUEL)
+    end)
+    
+    return ok and result or 0
 end
 
--- Charger les fioles dans un alambic
-function Brewing.loadBottles(standIndex, chestType, itemId, nbt, count)
+-- Charger les fioles d'eau dans un alambic (CORRIGÉ)
+function Brewing.loadWaterBottles(standIndex, count)
     local stand = brewingStands[standIndex]
     if not stand then return 0 end
     
     local loaded = 0
     local targetSlots = { SLOTS.BOTTLE_1, SLOTS.BOTTLE_2, SLOTS.BOTTLE_3 }
-    local slots = Inventory.findAllItems(chestType, itemId, nbt)
     
-    local chestName = chestType == "water" and "water_bottles" or chestType
-    local chest = peripheral.wrap(config.peripherals.chests[chestName])
+    local chest = Inventory.getChest("water")
+    if not chest then return 0 end
+    
+    local chestName = Inventory.getChestName("water")
+    if not chestName then return 0 end
+    
+    -- Lister les potions dans le coffre d'eau
+    local items = Inventory.list("water")
     
     for _, targetSlot in ipairs(targetSlots) do
         if loaded >= count then break end
         if loaded >= 3 then break end
         
-        -- Vérifier si le slot est vide
-        local standItems = stand.peripheral.list()
+        -- Vérifier si le slot de l'alambic est vide
+        local standItems = {}
+        pcall(function() standItems = stand.peripheral.list() or {} end)
+        
         if not standItems[targetSlot] then
-            -- Chercher un item à transférer
-            for _, slotInfo in ipairs(slots) do
-                if slotInfo.item.count > 0 then
-                    local transferred = chest.pushItems(stand.name, slotInfo.slot, 1, targetSlot)
-                    if transferred > 0 then
+            -- Chercher une fiole d'eau à transférer
+            for slot, item in pairs(items) do
+                if item.name == "minecraft:potion" and item.count > 0 then
+                    local ok, transferred = pcall(function()
+                        return chest.pushItems(stand.name, slot, 1, targetSlot)
+                    end)
+                    
+                    if ok and transferred and transferred > 0 then
                         loaded = loaded + 1
-                        slotInfo.item.count = slotInfo.item.count - 1
+                        item.count = item.count - 1
                         break
                     end
                 end
@@ -191,7 +214,13 @@ function Brewing.loadIngredient(standIndex, ingredientId, count)
     if not slot then return 0 end
     
     local chest = Inventory.getChest("ingredients")
-    return chest.pushItems(stand.name, slot, count or 1, SLOTS.INGREDIENT)
+    if not chest then return 0 end
+    
+    local ok, result = pcall(function()
+        return chest.pushItems(stand.name, slot, count or 1, SLOTS.INGREDIENT)
+    end)
+    
+    return ok and result or 0
 end
 
 -- Récupérer les potions d'un alambic
@@ -202,12 +231,17 @@ function Brewing.unloadBottles(standIndex, targetChest)
     local unloaded = 0
     local sourceSlots = { SLOTS.BOTTLE_1, SLOTS.BOTTLE_2, SLOTS.BOTTLE_3 }
     
-    local chestName = targetChest == "water" and "water_bottles" or targetChest
-    local chest = peripheral.wrap(config.peripherals.chests[chestName])
+    local chest = Inventory.getChest(targetChest)
+    if not chest then return 0 end
     
     for _, sourceSlot in ipairs(sourceSlots) do
-        local transferred = chest.pullItems(stand.name, sourceSlot)
-        unloaded = unloaded + transferred
+        local ok, transferred = pcall(function()
+            return chest.pullItems(stand.name, sourceSlot)
+        end)
+        
+        if ok and transferred then
+            unloaded = unloaded + transferred
+        end
     end
     
     return unloaded
@@ -219,7 +253,7 @@ function Brewing.waitForCompletion(standIndex, timeout)
     if not stand then return false end
     
     local startTime = os.clock()
-    timeout = timeout or 30 -- 30 secondes par défaut
+    timeout = timeout or 30
     
     while os.clock() - startTime < timeout do
         Brewing.updateStandStatus(standIndex)
@@ -231,10 +265,10 @@ function Brewing.waitForCompletion(standIndex, timeout)
         sleep(0.5)
     end
     
-    return false -- Timeout
+    return false
 end
 
--- Exécuter une étape de brassage
+-- Exécuter une étape de brassage (CORRIGÉ)
 function Brewing.executeStep(standIndex, step, quantity)
     local stand = brewingStands[standIndex]
     if not stand then return false, "Alambic invalide" end
@@ -243,7 +277,7 @@ function Brewing.executeStep(standIndex, step, quantity)
     
     if step.type == "source" then
         -- Charger les fioles d'eau
-        local loaded = Brewing.loadBottles(standIndex, "water", "minecraft:potion", "water", quantity)
+        local loaded = Brewing.loadWaterBottles(standIndex, quantity)
         if loaded < quantity then
             return false, "Pas assez de fioles d'eau (charge: " .. loaded .. "/" .. quantity .. ")"
         end
@@ -266,7 +300,7 @@ function Brewing.executeStep(standIndex, step, quantity)
         end
         
         -- Attendre la fin du brassage
-        sleep(0.5) -- Petit délai pour que le brassage démarre
+        sleep(1)
         
         local completed = Brewing.waitForCompletion(standIndex, 25)
         if not completed then

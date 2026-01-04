@@ -1,6 +1,7 @@
 -- ============================================
 -- Potion Maker - Programme Principal
 -- Système automatique de brassage de potions
+-- Version corrigée
 -- ============================================
 
 -- Charger les modules
@@ -165,7 +166,7 @@ local function processQueue()
             end
         end
         
-        sleep(1)
+        sleep(2)
     end
 end
 
@@ -177,7 +178,7 @@ local function autoSort()
         
         if total > 0 then
             -- Des items ont été triés
-            Sound.click()
+            UI.forceRefresh()
         end
         
         sleep(5) -- Vérifier toutes les 5 secondes
@@ -198,19 +199,19 @@ local function checkStock()
             })
         end
         
-        sleep(30) -- Vérifier toutes les 30 secondes
+        sleep(60) -- Vérifier toutes les 60 secondes (moins fréquent)
     end
 end
 
--- Mise à jour de l'interface
+-- Mise à jour de l'interface (INTERVAL AUGMENTÉ)
 local function updateUI()
     while running do
         UI.draw()
-        sleep(0.5)
+        sleep(1) -- 1 seconde au lieu de 0.5
     end
 end
 
--- Gestion des événements moniteur
+-- Gestion des événements moniteur (CORRIGÉ)
 local function handleMonitorEvents()
     while running do
         local event, side, x, y = os.pullEvent()
@@ -236,16 +237,21 @@ local function handleMonitorEvents()
                     end
                     
                 elseif action.type == "distribute" then
-                    -- Distribuer des potions
+                    -- CORRECTION: Distribuer des potions avec displayName
                     local distributed = Inventory.distributePotion(
-                        action.item.name,
-                        action.item.nbt and textutils.serialise(action.item.nbt),
-                        1
+                        action.displayName,
+                        action.count or 1
                     )
                     
                     if distributed > 0 then
                         Sound.notify()
+                        UI.forceRefresh()
+                    else
+                        Sound.error()
                     end
+                    
+                elseif action.type == "navigate" then
+                    UI.forceRefresh()
                 end
             end
             
@@ -263,7 +269,7 @@ end
 -- Gestion des événements réseau (pocket)
 local function handleNetworkEvents()
     while running do
-        local senderId, message = rednet.receive(config.network.protocol, 1)
+        local senderId, message = rednet.receive(config.network.protocol, 2)
         
         if senderId and message then
             local response = Network.handleRequest(senderId, message)
@@ -272,6 +278,7 @@ local function handleNetworkEvents()
             -- Si c'est une commande, mettre à jour l'UI
             if message.action == "order" and response.success then
                 Sound.orderReceived()
+                UI.forceRefresh()
             end
         end
     end
@@ -282,7 +289,7 @@ local function handleTerminal()
     while running do
         term.setCursorPos(1, 1)
         term.clearLine()
-        term.write("Potion Maker | Q pour quitter | R pour reconfigurer")
+        term.write("Potion Maker | Q=Quitter R=Reconfig")
         
         local event, key = os.pullEvent("key")
         

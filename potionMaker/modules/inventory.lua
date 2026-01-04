@@ -1,21 +1,31 @@
 -- ============================================
 -- Potion Maker - Module Inventaire
 -- Gestion des coffres et tri automatique
+-- Version corrigée pour MC 1.21
 -- ============================================
 
 local Inventory = {}
 
 -- Références aux coffres (initialisées par init)
 local chests = {}
+local chestNames = {}
 
 -- Initialiser les références aux coffres
 function Inventory.init(config)
+    chestNames = {
+        input = config.peripherals.chests.input,
+        water = config.peripherals.chests.water_bottles,
+        ingredients = config.peripherals.chests.ingredients,
+        potions = config.peripherals.chests.potions,
+        output = config.peripherals.chests.output
+    }
+    
     chests = {
-        input = config.peripherals.chests.input and peripheral.wrap(config.peripherals.chests.input),
-        water = config.peripherals.chests.water_bottles and peripheral.wrap(config.peripherals.chests.water_bottles),
-        ingredients = config.peripherals.chests.ingredients and peripheral.wrap(config.peripherals.chests.ingredients),
-        potions = config.peripherals.chests.potions and peripheral.wrap(config.peripherals.chests.potions),
-        output = config.peripherals.chests.output and peripheral.wrap(config.peripherals.chests.output)
+        input = chestNames.input and peripheral.wrap(chestNames.input),
+        water = chestNames.water and peripheral.wrap(chestNames.water),
+        ingredients = chestNames.ingredients and peripheral.wrap(chestNames.ingredients),
+        potions = chestNames.potions and peripheral.wrap(chestNames.potions),
+        output = chestNames.output and peripheral.wrap(chestNames.output)
     }
     
     -- Vérifier les connexions
@@ -29,8 +39,8 @@ function Inventory.init(config)
 end
 
 -- Obtenir le nom du périphérique pour les transferts
-function Inventory.getChestName(config, chestType)
-    return config.peripherals.chests[chestType]
+function Inventory.getChestName(chestType)
+    return chestNames[chestType]
 end
 
 -- Lister le contenu d'un coffre
@@ -38,7 +48,9 @@ function Inventory.list(chestType)
     local chest = chests[chestType]
     if not chest then return {} end
     
-    local items = chest.list()
+    local ok, items = pcall(function() return chest.list() end)
+    if not ok or not items then return {} end
+    
     local result = {}
     
     for slot, item in pairs(items) do
@@ -58,23 +70,62 @@ function Inventory.getItemDetail(chestType, slot)
     local chest = chests[chestType]
     if not chest then return nil end
     
-    return chest.getItemDetail(slot)
+    local ok, detail = pcall(function() return chest.getItemDetail(slot) end)
+    if ok then return detail end
+    return nil
 end
 
--- Compter un item spécifique dans un coffre
-function Inventory.countItem(chestType, itemId, nbt)
-    local items = Inventory.list(chestType)
+-- Vérifier si une potion est une fiole d'eau
+function Inventory.isWaterBottle(detail)
+    if not detail then return false end
+    if detail.name ~= "minecraft:potion" then return false end
+    
+    -- Méthode 1: Vérifier le displayName
+    local displayName = detail.displayName or ""
+    if displayName:lower():find("water") or displayName:lower():find("eau") then
+        return true
+    end
+    
+    -- Méthode 2: Vérifier le NBT (format peut varier)
+    if detail.nbt then
+        local nbtStr = textutils.serialise(detail.nbt)
+        if nbtStr:find("water") then
+            return true
+        end
+    end
+    
+    -- Méthode 3: Vérifier le tag (MC 1.21+)
+    if detail.tags then
+        for tag, _ in pairs(detail.tags) do
+            if tag:find("water") then
+                return true
+            end
+        end
+    end
+    
+    return false
+end
+
+-- Compter les fioles d'eau (VERSION CORRIGÉE)
+function Inventory.countWaterBottles()
+    local items = Inventory.list("water")
     local count = 0
     
-    for _, item in pairs(items) do
-        if item.name == itemId then
-            if nbt then
-                -- Vérifier le NBT si spécifié
-                local detail = Inventory.getItemDetail(chestType, item.slot)
-                if detail and detail.nbt and textutils.serialise(detail.nbt):find(nbt) then
-                    count = count + item.count
-                end
-            else
+    for slot, item in pairs(items) do
+        -- Option 1: Si c'est une potion, vérifier si c'est de l'eau
+        if item.name == "minecraft:potion" then
+            local detail = Inventory.getItemDetail("water", slot)
+            if Inventory.isWaterBottle(detail) then
+                count = count + item.count
+            end
+        end
+    end
+    
+    -- Si on ne trouve rien avec la vérification stricte,
+    -- compter toutes les potions du coffre d'eau (car c'est dédié)
+    if count == 0 then
+        for slot, item in pairs(items) do
+            if item.name == "minecraft:potion" then
                 count = count + item.count
             end
         end
@@ -83,9 +134,18 @@ function Inventory.countItem(chestType, itemId, nbt)
     return count
 end
 
--- Compter les fioles d'eau
-function Inventory.countWaterBottles()
-    return Inventory.countItem("water", "minecraft:potion", "water")
+-- Compter un item spécifique dans un coffre
+function Inventory.countItem(chestType, itemId)
+    local items = Inventory.list(chestType)
+    local count = 0
+    
+    for _, item in pairs(items) do
+        if item.name == itemId then
+            count = count + item.count
+        end
+    end
+    
+    return count
 end
 
 -- Compter un ingrédient
@@ -116,21 +176,24 @@ function Inventory.getPotionsStock()
     
     for slot, item in pairs(items) do
         local detail = Inventory.getItemDetail("potions", slot)
-        local key = item.name
         
-        -- Construire une clé unique basée sur le NBT
-        if detail and detail.nbt then
-            key = key .. ":" .. textutils.serialise(detail.nbt)
+        -- Utiliser le displayName comme clé
+        local displayName = "Potion"
+        if detail and detail.displayName then
+            displayName = detail.displayName
         end
+        
+        local key = displayName
         
         if stock[key] then
             stock[key].count = stock[key].count + item.count
+            table.insert(stock[key].slots, slot)
         else
             stock[key] = {
                 name = item.name,
                 count = item.count,
-                nbt = detail and detail.nbt,
-                displayName = detail and detail.displayName or item.name
+                displayName = displayName,
+                slots = { slot }
             }
         end
     end
@@ -138,41 +201,27 @@ function Inventory.getPotionsStock()
     return stock
 end
 
--- Transférer des items d'un coffre à un autre
-function Inventory.transfer(fromChest, toChest, slot, count, toSlot)
-    local from = chests[fromChest]
-    local toName = nil
-    
-    -- Obtenir le nom du coffre destination pour pushItems
-    if toChest == "input" then toName = "input"
-    elseif toChest == "water" then toName = "water_bottles"
-    elseif toChest == "ingredients" then toName = "ingredients"
-    elseif toChest == "potions" then toName = "potions"
-    elseif toChest == "output" then toName = "output"
-    end
-    
-    if not from then return 0 end
-    
-    -- Utiliser le nom du périphérique pour le transfert
-    -- pushItems attend le nom du périphérique réseau
-    return from.pushItems(peripheral.getName(chests[toChest]), slot, count, toSlot)
-end
-
 -- Trouver un slot contenant un item spécifique
-function Inventory.findItem(chestType, itemId, nbt)
+function Inventory.findItem(chestType, itemId)
     local items = Inventory.list(chestType)
     
     for slot, item in pairs(items) do
         if item.name == itemId then
-            if nbt then
-                local detail = Inventory.getItemDetail(chestType, slot)
-                if detail and detail.nbt then
-                    local nbtStr = textutils.serialise(detail.nbt)
-                    if nbtStr:find(nbt) then
-                        return slot, item
-                    end
-                end
-            else
+            return slot, item
+        end
+    end
+    
+    return nil, nil
+end
+
+-- Trouver une fiole d'eau
+function Inventory.findWaterBottle()
+    local items = Inventory.list("water")
+    
+    for slot, item in pairs(items) do
+        if item.name == "minecraft:potion" then
+            local detail = Inventory.getItemDetail("water", slot)
+            if Inventory.isWaterBottle(detail) or true then -- Fallback: accepter toute potion du coffre eau
                 return slot, item
             end
         end
@@ -182,23 +231,13 @@ function Inventory.findItem(chestType, itemId, nbt)
 end
 
 -- Trouver tous les slots contenant un item
-function Inventory.findAllItems(chestType, itemId, nbt)
+function Inventory.findAllItems(chestType, itemId)
     local items = Inventory.list(chestType)
     local found = {}
     
     for slot, item in pairs(items) do
         if item.name == itemId then
-            if nbt then
-                local detail = Inventory.getItemDetail(chestType, slot)
-                if detail and detail.nbt then
-                    local nbtStr = textutils.serialise(detail.nbt)
-                    if nbtStr:find(nbt) then
-                        table.insert(found, { slot = slot, item = item })
-                    end
-                end
-            else
-                table.insert(found, { slot = slot, item = item })
-            end
+            table.insert(found, { slot = slot, item = item })
         end
     end
     
@@ -207,6 +246,9 @@ end
 
 -- Tri automatique du coffre input
 function Inventory.sortInput(config)
+    local inputChest = chests.input
+    if not inputChest then return { water = 0, ingredients = 0, potions = 0 } end
+    
     local items = Inventory.list("input")
     local sorted = {
         water = 0,
@@ -216,43 +258,84 @@ function Inventory.sortInput(config)
     
     for slot, item in pairs(items) do
         local detail = Inventory.getItemDetail("input", slot)
-        local targetChest = nil
+        local targetName = nil
         
         -- Fioles d'eau
-        if item.name == "minecraft:potion" then
-            if detail and detail.nbt then
-                local nbtStr = textutils.serialise(detail.nbt)
-                if nbtStr:find("water") then
-                    targetChest = "water"
-                else
-                    -- Autre potion -> stockage potions
-                    targetChest = "potions"
-                end
-            end
+        if item.name == "minecraft:potion" and Inventory.isWaterBottle(detail) then
+            targetName = chestNames.water
+            sorted.water = sorted.water + item.count
         -- Splash potion ou lingering -> stockage potions
         elseif item.name == "minecraft:splash_potion" or item.name == "minecraft:lingering_potion" then
-            targetChest = "potions"
-        -- Fioles vides -> considérées comme ingrédients ou eau
+            targetName = chestNames.potions
+            sorted.potions = sorted.potions + item.count
+        -- Autre potion -> stockage potions
+        elseif item.name == "minecraft:potion" then
+            targetName = chestNames.potions
+            sorted.potions = sorted.potions + item.count
+        -- Fioles vides -> coffre eau
         elseif item.name == "minecraft:glass_bottle" then
-            targetChest = "water"
+            targetName = chestNames.water
+            sorted.water = sorted.water + item.count
         -- Tout le reste -> ingrédients
         else
-            targetChest = "ingredients"
+            targetName = chestNames.ingredients
+            sorted.ingredients = sorted.ingredients + item.count
         end
         
-        if targetChest then
-            local inputChest = peripheral.wrap(config.peripherals.chests.input)
-            local targetName = config.peripherals.chests[targetChest == "water" and "water_bottles" or targetChest]
-            
-            local transferred = inputChest.pushItems(targetName, slot)
-            
-            if transferred > 0 then
-                sorted[targetChest] = sorted[targetChest] + transferred
-            end
+        if targetName then
+            pcall(function()
+                inputChest.pushItems(targetName, slot)
+            end)
         end
     end
     
     return sorted
+end
+
+-- Distribuer des potions vers output (VERSION CORRIGÉE)
+function Inventory.distributePotion(displayName, count)
+    local potionsChest = chests.potions
+    local outputName = chestNames.output
+    
+    if not potionsChest or not outputName then 
+        return 0 
+    end
+    
+    local remaining = count
+    local items = Inventory.list("potions")
+    
+    for slot, item in pairs(items) do
+        if remaining <= 0 then break end
+        
+        local detail = Inventory.getItemDetail("potions", slot)
+        local itemDisplayName = detail and detail.displayName or "Potion"
+        
+        -- Comparer les noms
+        if itemDisplayName == displayName or displayName == nil then
+            local toTransfer = math.min(remaining, item.count)
+            local ok, transferred = pcall(function()
+                return potionsChest.pushItems(outputName, slot, toTransfer)
+            end)
+            
+            if ok and transferred then
+                remaining = remaining - transferred
+            end
+        end
+    end
+    
+    return count - remaining
+end
+
+-- Distribuer toutes les potions d'un type vers output
+function Inventory.distributeAllOfType(displayName)
+    local stock = Inventory.getPotionsStock()
+    local potionInfo = stock[displayName]
+    
+    if potionInfo then
+        return Inventory.distributePotion(displayName, potionInfo.count)
+    end
+    
+    return 0
 end
 
 -- Extraire des items vers l'alambic
@@ -260,7 +343,11 @@ function Inventory.extractToBrewingStand(chestType, slot, brewingStandName, brew
     local chest = chests[chestType]
     if not chest then return 0 end
     
-    return chest.pushItems(brewingStandName, slot, count, brewSlot)
+    local ok, result = pcall(function()
+        return chest.pushItems(brewingStandName, slot, count, brewSlot)
+    end)
+    
+    return ok and result or 0
 end
 
 -- Récupérer des items depuis l'alambic
@@ -268,26 +355,11 @@ function Inventory.extractFromBrewingStand(brewingStandName, brewSlot, chestType
     local chest = chests[chestType]
     if not chest then return 0 end
     
-    return chest.pullItems(brewingStandName, brewSlot, count)
-end
-
--- Distribuer des potions vers output
-function Inventory.distributePotion(itemId, nbt, count)
-    local remaining = count
-    local slots = Inventory.findAllItems("potions", itemId, nbt)
+    local ok, result = pcall(function()
+        return chest.pullItems(brewingStandName, brewSlot, count)
+    end)
     
-    for _, slotInfo in ipairs(slots) do
-        if remaining <= 0 then break end
-        
-        local toTransfer = math.min(remaining, slotInfo.item.count)
-        local potionsChest = chests.potions
-        local outputName = peripheral.getName(chests.output)
-        
-        local transferred = potionsChest.pushItems(outputName, slotInfo.slot, toTransfer)
-        remaining = remaining - transferred
-    end
-    
-    return count - remaining
+    return ok and result or 0
 end
 
 -- Vérifier si on a assez d'ingrédients
@@ -320,15 +392,13 @@ function Inventory.getSize(chestType)
     local chest = chests[chestType]
     if not chest then return 0 end
     
-    return chest.size()
+    local ok, size = pcall(function() return chest.size() end)
+    return ok and size or 0
 end
 
 -- Obtenir le nombre de slots libres
 function Inventory.getFreeSlots(chestType)
-    local chest = chests[chestType]
-    if not chest then return 0 end
-    
-    local total = chest.size()
+    local total = Inventory.getSize(chestType)
     local items = Inventory.list(chestType)
     local used = 0
     
